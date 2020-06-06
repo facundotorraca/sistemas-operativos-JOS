@@ -55,67 +55,61 @@ mon_kerninfo(int argc, char **argv, struct Trapframe *tf)
 	return 0;
 }
 
+static void
+print_backtrace_info(const uint32_t* ebp, uint32_t eip, const uint32_t* args,
+                     const struct Eipdebuginfo* info)
+{
+    uint32_t eip_offset = eip - info->eip_fn_addr;
+
+    cprintf("  ebp %08x  eip %08x  args %08x %08x %08x %08x %08x\n",
+            ebp, eip, args[0], args[1], args[2], args[3], args[4]);
+
+    cprintf("         %s:%d: %.*s+%d\n", info->eip_file, info->eip_line,
+            info->eip_fn_namelen, info->eip_fn_name, eip_offset);
+}
+
 int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 {
     /*
-     * read_epb() is happening after the function prologue, then the stack
-     * frame of the current function is not missing.
      * The ebp value indicates the base pointer into the stack used by that
-     * function: i.e., the position of the stack pointer just after the function
-     * was entered and the function prologue code set up the base pointer.
+     * function.
+     * After saving current ebp, we can  call any function inside, no matter if
+     * ebp changes.
     */
      uint32_t* ebp = (uint32_t *)read_ebp();
 
      /*
       * return address is 4 bytes above ebp.
       * ebp's value just after entering the function, contains the memory
-      * address of the top of the stack.
+      * address of the top of the stack, then ebp +1 is return address direction.
      */
-     uint32_t* stack_eip_addr_pos = ebp + 1;
+     uint32_t* stack_eip_addr = ebp + 1;
 
      /*
       * eip value is the function's return instruction pointer: the instruction
       * address to which control will return when the function returns.
      */
-     uintptr_t eip = (uintptr_t)(*stack_eip_addr_pos);
+     uintptr_t eip = (uintptr_t)(*stack_eip_addr);
 
-     uint32_t args[5] = {0};
-
-     uint32_t eip_offset;
-
+     uint32_t* args;
      struct Eipdebuginfo info;
 
-     /*
-      * first ebp is initialized with 0x0
-      * initialization code:
-      * movl    $0x0,%ebp # nuke frame pointer
-     */
+     //first ebp is initialized with 0x0
      while (ebp != 0) {
          // get info about previous function
          debuginfo_eip(eip, &info);
 
-         eip_offset = eip - info.eip_fn_addr;
+         // load function args
+         args = ebp + 2;
 
-         uint32_t arg_val;
-
-         for (int i = 0; i < 5; i++) {
-            arg_val = (uint32_t)(ebp + (i + 2));
-            arg_val = *(uint32_t *)arg_val;
-            args[i] = arg_val;
-         }
-
-         cprintf("  ebp %08x  eip %08x  args %08x %08x %08x %08x %08x\n",
-                 ebp, eip, args[0], args[1], args[2], args[3], args[4]);
-
-         cprintf("         %s:%d: %.*s+%d\n", info.eip_file, info.eip_line,
-                 info.eip_fn_namelen, info.eip_fn_name, eip_offset);
+         print_backtrace_info(ebp, eip, args, &info);
 
          // ebp --> prev_ebp
          ebp = (uint32_t *)(*ebp);
 
-         stack_eip_addr_pos = ebp + 1;
-         eip = (uintptr_t)(*stack_eip_addr_pos);
+         stack_eip_addr = ebp + 1;
+         eip = (uintptr_t)(*stack_eip_addr);
      }
 
  	return 0;
