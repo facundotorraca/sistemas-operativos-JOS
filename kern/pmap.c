@@ -103,10 +103,22 @@ boot_alloc(uint32_t n)
 	// Allocate a chunk large enough to hold 'n' bytes, then update
 	// nextfree.  Make sure nextfree is kept aligned
 	// to a multiple of PGSIZE.
-	//
-	// LAB 2: Your code here.
 
-	return NULL;
+    uint32_t total_memory = KERNBASE + npages * PGSIZE;
+
+    uint32_t bytes_to_alloc = ROUNDUP(n, PGSIZE);
+    uint32_t pages_to_alloc = bytes_to_alloc / PGSIZE;
+
+    uint32_t aux_nf = (uint32_t)nextfree + bytes_to_alloc;
+
+    if (aux_nf > total_memory)
+        panic("boot_alloc: not enough memory\n");
+
+    result = nextfree;
+
+    nextfree = (char *)aux_nf;
+
+    return result;
 }
 
 // Set up a two-level page table:
