@@ -104,7 +104,7 @@ boot_alloc(uint32_t n)
 	// nextfree.  Make sure nextfree is kept aligned
 	// to a multiple of PGSIZE.
 
-    uint32_t total_memory = KERNBASE + npages * PGSIZE;
+    uint32_t total_memory = npages * PGSIZE;
 
     uint32_t bytes_to_alloc = ROUNDUP(n, PGSIZE);
     uint32_t pages_to_alloc = bytes_to_alloc / PGSIZE;
