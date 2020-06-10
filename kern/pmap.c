@@ -337,10 +337,13 @@ page_alloc(int alloc_flags)
 
     // save first free page
     struct PageInfo* result = page_free_list;
-    result->pp_link = NULL;
 
     // pop first free page
     page_free_list = page_free_list->pp_link;
+
+    // pp_link field of the allocated page to NULL so
+    // page_free can check for double-free bugs.
+    result->pp_link = NULL;
 
 	if (alloc_flags & ALLOC_ZERO) {
         // get kernel virtual address
