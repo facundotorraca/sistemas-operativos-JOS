@@ -100,23 +100,26 @@ boot_alloc(uint32_t n)
 		nextfree = ROUNDUP((char *) end, PGSIZE);
 	}
 
+    if (n == 0)
+        return nextfree;
+
 	// Allocate a chunk large enough to hold 'n' bytes, then update
 	// nextfree.  Make sure nextfree is kept aligned
 	// to a multiple of PGSIZE.
 
-    uint32_t total_memory = npages * PGSIZE;
+    uint32_t max_mem = (npages * PGSIZE) + KERNBASE;
 
     uint32_t bytes_to_alloc = ROUNDUP(n, PGSIZE);
     uint32_t pages_to_alloc = bytes_to_alloc / PGSIZE;
 
-    uint32_t aux_nf = (uint32_t)nextfree - KERNBASE + bytes_to_alloc;
+    uint32_t aux_nf = (uint32_t)nextfree + bytes_to_alloc;
 
-    if (aux_nf > total_memory)
+    if (aux_nf > max_mem)
         panic("boot_alloc: not enough memory\n");
 
     result = nextfree;
 
-    nextfree = (char *)aux_nf + KERNBASE;
+    nextfree = (char *)aux_nf;
 
     return result;
 }
@@ -248,7 +251,7 @@ mem_init(void)
 static int
 is_initial_free_page(size_t pnumber)
 {
-    // virtual page address
+    // virtual page start address
     uint32_t vpa = (pnumber * PGSIZE) + KERNBASE;
 
     //[vap, vpa + PGSIZE]
@@ -259,12 +262,16 @@ is_initial_free_page(size_t pnumber)
     if (vpa >= (IOPHYSMEM + KERNBASE) && vpa < (EXTPHYSMEM + KERNBASE))
         return 0;
 
-    // Memory allocated by boot_alloc for pages array
+    // Memory allocated by boot_alloc for pages array and first page
     if (vpa >= (uint32_t)pages && vpa < (uint32_t)(pages + npages))
         return 0;
 
     // Memory allocated for the kernel
-    if (vpa >= (*kern_pgdir) && vpa < (uint32_t)end)
+    if (vpa >= (EXTPHYSMEM + KERNBASE) && vpa < (uint32_t)end)
+        return 0;
+
+    // First page allocated
+    if (vpa == (uint32_t)kern_pgdir)
         return 0;
 
     // Page zero
