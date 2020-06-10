@@ -100,26 +100,26 @@ boot_alloc(uint32_t n)
 		nextfree = ROUNDUP((char *) end, PGSIZE);
 	}
 
-    if (n == 0)
-        return nextfree;
+    if (n == 0) return nextfree;
 
 	// Allocate a chunk large enough to hold 'n' bytes, then update
 	// nextfree.  Make sure nextfree is kept aligned
 	// to a multiple of PGSIZE.
 
-    uint32_t max_mem = (npages * PGSIZE) + KERNBASE;
+    // max memory address
+    uint32_t max_memaddr = (npages * PGSIZE) + KERNBASE;
 
     uint32_t bytes_to_alloc = ROUNDUP(n, PGSIZE);
     uint32_t pages_to_alloc = bytes_to_alloc / PGSIZE;
 
-    uint32_t aux_nf = (uint32_t)nextfree + bytes_to_alloc;
+    // next nextfree address
+    uint32_t next_nf = (uint32_t)nextfree + bytes_to_alloc;
 
-    if (aux_nf > max_mem)
+    if (max_memaddr > max_mem)
         panic("boot_alloc: not enough memory\n");
 
     result = nextfree;
-
-    nextfree = (char *)aux_nf;
+    nextfree = (char *)next_nf;
 
     return result;
 }
@@ -254,8 +254,6 @@ is_initial_free_page(size_t pnumber)
     // virtual page start address
     uint32_t vpa = (pnumber * PGSIZE) + KERNBASE;
 
-    //[vap, vpa + PGSIZE]
-
     extern char end[];
 
     // 384Kb section reserved for I/O
@@ -309,7 +307,7 @@ page_init(void)
 	// free pages!
 	size_t i;
 	for (i = 0; i < npages; i++) {
-	    if(is_initial_free_page(i)){
+	    if (is_initial_free_page(i)) {
             pages[i].pp_link = page_free_list;
             page_free_list = &pages[i];
 	    }
@@ -361,12 +359,11 @@ page_alloc(int alloc_flags)
 void
 page_free(struct PageInfo *pp)
 {
-    if(pp->pp_ref != 0) {
+    if (pp->pp_ref != 0)
         panic("Page free: pp->pp_ref is nonzero\n");
-    }
-    if(pp->pp_link){
+
+    if (pp->pp_link)
         panic("Page free: pp->pp_link is not NULL\n");
-    }
 
     pp->pp_link = page_free_list;
     page_free_list = pp;
