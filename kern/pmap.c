@@ -194,7 +194,6 @@ mem_init(void)
 	// Your code goes here:
 
 
-
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
 	// stack.  The kernel stack grows down from virtual address KSTACKTOP.
@@ -241,6 +240,29 @@ mem_init(void)
 	check_page_installed_pgdir();
 }
 
+static int
+is_initial_free_page(struct PageInfo* page, size_t pnumber)
+{
+    if (pnumber == 0) {
+        return 0;
+    }
+
+    if (pnumber * PGSIZE >= IOPHYSMEM && pnumber * PGSIZE < EXTPHYSMEM){
+        return 0;
+    }
+
+    if (pnumber * PGSIZE >= pages - KERNBASE && pnumber * PGSIZE < pages + npages - KERNBASE) {
+        return 0;
+    }
+
+    extern char end[];
+    if (pnumber * PGSIZE >= *kern_pgdir - KERNBASE && pnumber * PGSIZE < (uint32_t)((char*)end) - KERNBASE) {
+        return 0;
+    }
+
+    return 1;
+}
+
 // --------------------------------------------------------------
 // Tracking of physical pages.
 // The 'pages' array has one 'struct PageInfo' entry per physical page.
@@ -275,9 +297,10 @@ page_init(void)
 	// free pages!
 	size_t i;
 	for (i = 0; i < npages; i++) {
-		pages[i].pp_ref = 0;
-		pages[i].pp_link = page_free_list;
-		page_free_list = &pages[i];
+	    if(is_initial_free_page(&pages[i], i)){
+            pages[i].pp_link = page_free_list;
+            page_free_list = &pages[i];
+	    }
 	}
 }
 
