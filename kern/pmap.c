@@ -109,14 +109,14 @@ boot_alloc(uint32_t n)
     uint32_t bytes_to_alloc = ROUNDUP(n, PGSIZE);
     uint32_t pages_to_alloc = bytes_to_alloc / PGSIZE;
 
-    uint32_t aux_nf = (uint32_t)nextfree + bytes_to_alloc;
+    uint32_t aux_nf = (uint32_t)nextfree - KERNBASE + bytes_to_alloc;
 
     if (aux_nf > total_memory)
         panic("boot_alloc: not enough memory\n");
 
     result = nextfree;
 
-    nextfree = (char *)aux_nf;
+    nextfree = (char *)aux_nf + KERNBASE;
 
     return result;
 }
@@ -140,7 +140,8 @@ mem_init(void)
 	i386_detect_memory();
 
 	// Remove this line when you're ready to test this function.
-	//panic("mem_init: This function is not finished\n");
+
+    //panic("mem_init: This function is not finished\n");
 
 	//////////////////////////////////////////////////////////////////////
 	// create initial page directory.
@@ -249,6 +250,8 @@ is_initial_free_page(size_t pnumber)
 {
     // virtual page address
     uint32_t vpa = (pnumber * PGSIZE) + KERNBASE;
+
+    //[vap, vpa + PGSIZE]
 
     extern char end[];
 
