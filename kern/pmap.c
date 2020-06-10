@@ -165,10 +165,8 @@ mem_init(void)
 	// memset
 	// to initialize all fields of each struct PageInfo to 0.
 	// Your code goes here:
-
 	pages = boot_alloc(sizeof(struct PageInfo) * npages);
 	memset(pages, 0, sizeof(struct PageInfo) * npages);
-
 
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -240,34 +238,38 @@ mem_init(void)
 	check_page_installed_pgdir();
 }
 
-static int
-is_initial_free_page(struct PageInfo* page, size_t pnumber)
-{
-    if (pnumber == 0) {
-        return 0;
-    }
-
-    if (pnumber * PGSIZE >= IOPHYSMEM && pnumber * PGSIZE < EXTPHYSMEM){
-        return 0;
-    }
-
-    if (pnumber * PGSIZE >= pages - KERNBASE && pnumber * PGSIZE < pages + npages - KERNBASE) {
-        return 0;
-    }
-
-    extern char end[];
-    if (pnumber * PGSIZE >= *kern_pgdir - KERNBASE && pnumber * PGSIZE < (uint32_t)((char*)end) - KERNBASE) {
-        return 0;
-    }
-
-    return 1;
-}
-
 // --------------------------------------------------------------
 // Tracking of physical pages.
 // The 'pages' array has one 'struct PageInfo' entry per physical page.
 // Pages are reference counted, and free pages are kept on a linked list.
 // --------------------------------------------------------------
+
+static int
+is_initial_free_page(size_t pnumber)
+{
+    // virtual page address
+    uint32_t vpa = (pnumber * PGSIZE) + KERNBASE;
+
+    extern char end[];
+
+    // 384Kb section reserved for I/O
+    if (vpa >= (IOPHYSMEM + KERNBASE) && vpa < (EXTPHYSMEM + KERNBASE))
+        return 0;
+
+    // Memory allocated by boot_alloc for pages array
+    if (vpa >= (uint32_t)pages && vpa < (uint32_t)(pages + npages))
+        return 0;
+
+    // Memory allocated for the kernel
+    if (vpa >= (*kern_pgdir) && vpa < (uint32_t)end)
+        return 0;
+
+    // Page zero
+    if (vpa == KERNBASE)
+        return 0;
+
+    return 1;
+}
 
 //
 // Initialize page structure and memory free list.
@@ -297,7 +299,7 @@ page_init(void)
 	// free pages!
 	size_t i;
 	for (i = 0; i < npages; i++) {
-	    if(is_initial_free_page(&pages[i], i)){
+	    if(is_initial_free_page(i)){
             pages[i].pp_link = page_free_list;
             page_free_list = &pages[i];
 	    }
@@ -319,8 +321,24 @@ page_init(void)
 struct PageInfo *
 page_alloc(int alloc_flags)
 {
-	// Fill this function in
-	return 0;
+
+    if (!page_free_list)
+        return NULL;
+
+    // save first free page
+    struct PageInfo* result = page_free_list;
+    result->pp_link = NULL;
+
+    // pop first free page
+    page_free_list = page_free_list->pp_link;
+
+	if (alloc_flags & ALLOC_ZERO) {
+        // get kernel virtual address
+        void* kva = page2kva(result);
+        memset(kva, '\0', PGSIZE);
+    }
+
+	return result;
 }
 
 //
