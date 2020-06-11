@@ -456,7 +456,7 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 // should be set to 'perm|PTE_P'.
 //
 // Requirements
-//   - If there is already a page mapped at 'va', it should be page_remove()d.
+//   - If there is already a page mapped at 'va', it should be page_remove().
 //   - If necessary, on demand, a page table should be allocated and inserted
 //     into 'pgdir'.
 //   - pp->pp_ref should be incremented if the insertion succeeds.
@@ -478,7 +478,19 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 int
 page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 {
-	// Fill this function in
+	pte_t* pte = pgdir_walk(pgdir, va, 0);
+
+    if (pte) { // page exist
+        page_remove(pgdir, va);
+        pte = page_walk(pgdir, va, 1);
+        if (!pte) return -E_NO_MEM;
+    }
+
+
+    (*pte) = page2pa(pp);
+
+    (*pte) = (pte_t)PADDR(PDX(*pte), PTX(*pte), PGOFF(perm | PTE_P));
+
 	return 0;
 }
 
