@@ -405,8 +405,32 @@ page_decref(struct PageInfo *pp)
 pte_t *
 pgdir_walk(pde_t *pgdir, const void *va, int create)
 {
-	// Fill this function in
-	return NULL;
+    // page directory index
+    uintptr_t pdi = PDX(va);
+
+    // pgdir ---> Page Directory Begin
+    // pgdir[pdi] ---> Page Table
+    pte_t* pgtab = (pte_t *)pgdir[pdi];
+
+    if (!pgtab && !create) return NULL;
+
+    if (!pgtab && create) {
+        // allocate a page and clear it
+        struct PageInfo* pg = page_alloc(ALLOC_ZERO);
+
+        if (!pg) return NULL;
+
+        pg->pp_ref++;
+    }
+
+    // page directory index
+    uintptr_t pti = PTX(va);
+
+    // pgtab ---> Page Table Begin
+    // pgtab[pti] ---> Physical Page Address
+    pte_t* pte = &pgtab[pti];
+
+	return pte;
 }
 
 //
