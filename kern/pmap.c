@@ -496,8 +496,17 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 struct PageInfo *
 page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 {
-	// Fill this function in
-	return NULL;
+	pte_t* pte = pgdir_walk(pgdir, va, 0);
+
+	if (!pte){
+	    return NULL;
+	}
+
+	if (pte_store){
+        *pte = *pte_store;
+	}
+
+	return pa2page(PTE_ADDR(*pte));
 }
 
 //
