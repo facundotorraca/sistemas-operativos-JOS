@@ -502,7 +502,7 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 	    return NULL;
 	}
 
-	if (pte_store){
+	if (pte_store) {
         *pte = *pte_store;
 	}
 
@@ -527,7 +527,13 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 void
 page_remove(pde_t *pgdir, void *va)
 {
-	// Fill this function in
+    pte_t* pg_store = 0;
+    struct PageInfo* pg = page_lookup(pgdir, va, &pg_store);
+
+    if (!pg) return;
+
+    page_decref(pg);
+    tlb_invalidate(pgdir, va);
 }
 
 //
