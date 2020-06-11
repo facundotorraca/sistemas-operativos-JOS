@@ -115,7 +115,7 @@ boot_alloc(uint32_t n)
     // next nextfree address
     uint32_t next_nf = (uint32_t)nextfree + bytes_to_alloc;
 
-    if (max_memaddr > max_mem)
+    if (next_nf > max_memaddr)
         panic("boot_alloc: not enough memory\n");
 
     result = nextfree;
@@ -482,14 +482,14 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 
     if (pte) { // page exist
         page_remove(pgdir, va);
-        pte = page_walk(pgdir, va, 1);
+        pte = pgdir_walk(pgdir, va, 1);
         if (!pte) return -E_NO_MEM;
     }
 
 
     (*pte) = page2pa(pp);
 
-    (*pte) = (pte_t)PADDR(PDX(*pte), PTX(*pte), PGOFF(perm | PTE_P));
+    (*pte) = (pte_t)PGADDR(PDX(*pte), PTX(*pte), PGOFF(perm | PTE_P));
 
 	return 0;
 }
@@ -515,7 +515,7 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 	}
 
 	if (pte_store) {
-        *pte = *pte_store;
+        *pte = **pte_store;
 	}
 
 	return pa2page(PTE_ADDR(*pte));
