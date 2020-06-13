@@ -346,7 +346,7 @@ page_alloc(int alloc_flags)
 	if (alloc_flags & ALLOC_ZERO) {
         // get kernel virtual address
         void* kva = page2kva(result);
-        memset(kva, '\0', PGSIZE);
+        memset(kva, 0, PGSIZE);
     }
 
 	return result;
@@ -359,6 +359,10 @@ page_alloc(int alloc_flags)
 void
 page_free(struct PageInfo *pp)
 {
+    // Fill this function in
+	// Hint: You may want to panic if pp->pp_ref is nonzero or
+	// pp->pp_link is not NULL.
+
     if (pp->pp_ref != 0)
         panic("Page free: pp->pp_ref is nonzero\n");
 
@@ -483,19 +487,27 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 int
 page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 {
+    // PD[PDX(va)] ----> PT[PTX(a)] ----> Addr(pp)
 
+    // if page dont exist the pte is null
     pte_t* pte = pgdir_walk(pgdir, va, 0);
 
+    pp->pp_ref++;
+
     // if page exists then the page is removed
-    if (pte) page_remove(pgdir, va);
+    if (pte && (*pte & PTE_P)) {
+        page_remove(pgdir, va);
+        pp->pp_ref--;
+    }
 
     // create the new page on the pgdir for va
     pte = pgdir_walk(pgdir, va, 1);
 
     // not enough memory
-    if (!pte) return -E_NO_MEM;
-
-    pp->pp_ref++;
+    if (!pte) {
+        pp->pp_ref--;
+        return -E_NO_MEM;
+    }
 
     // physacal address of the physycal page
     physaddr_t pa = page2pa(pp);
@@ -547,13 +559,18 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 void
 page_remove(pde_t *pgdir, void *va)
 {
-    pte_t* pte;
+    pte_t* pte = NULL;
+
     struct PageInfo* pg = page_lookup(pgdir, va, &pte);
 
     if (!pg) return;
 
     (*pte) = 0;
+
+    // page is free if the refcount reaches 0.
     page_decref(pg);
+
+    // remove virtual address from the TLB
     tlb_invalidate(pgdir, va);
 }
 
