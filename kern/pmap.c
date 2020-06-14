@@ -330,8 +330,7 @@ struct PageInfo *
 page_alloc(int alloc_flags)
 {
 
-    if (!page_free_list)
-        return NULL;
+    if (!page_free_list) return NULL;
 
     // save first free page
     struct PageInfo* result = page_free_list;
@@ -432,7 +431,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
         // link page directory with page table
         physaddr_t pa = page2pa(pg);
 
-        pgdir[pdi] = (pte_t)PGADDR(PDX(pa), PTX(pa), PGOFF(PTE_P));
+        pgdir[pdi] = (pte_t)PGADDR(PDX(pa), PTX(pa), PGOFF(PTE_U|PTE_P));
     }
 
     // Page Table virtual address
@@ -487,27 +486,18 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 int
 page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 {
-    // PD[PDX(va)] ----> PT[PTX(a)] ----> Addr(pp)
+    // PD[PDX(va)] ----> PT[PTX(a)] ----> Addr(pp) || NULL
 
-    // if page dont exist the pte is null
-    pte_t* pte = pgdir_walk(pgdir, va, 0);
+    // create a new page on demmand
+    pte_t* pte = pgdir_walk(pgdir, va, 1);
+
+    // not enough memory
+    if (!pte) return -E_NO_MEM;
 
     pp->pp_ref++;
 
     // if page exists then the page is removed
-    if (pte && (*pte & PTE_P)) {
-        page_remove(pgdir, va);
-        pp->pp_ref--;
-    }
-
-    // create the new page on the pgdir for va
-    pte = pgdir_walk(pgdir, va, 1);
-
-    // not enough memory
-    if (!pte) {
-        pp->pp_ref--;
-        return -E_NO_MEM;
-    }
+    if (*pte) page_remove(pgdir, va);
 
     // physacal address of the physycal page
     physaddr_t pa = page2pa(pp);
@@ -532,13 +522,14 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 struct PageInfo *
 page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 {
+    // pte ---> Physical Address
 	pte_t* pte = pgdir_walk(pgdir, va, 0);
 
 	if (!pte) return NULL;
 
 	if (pte_store) *pte_store = pte;
 
-	return pa2page(PTE_ADDR(PADDR(pte)));
+	return pa2page(PTE_ADDR(*pte));
 }
 
 //
@@ -565,10 +556,10 @@ page_remove(pde_t *pgdir, void *va)
 
     if (!pg) return;
 
-    (*pte) = 0;
-
     // page is free if the refcount reaches 0.
     page_decref(pg);
+
+    if (pte) (*pte) = 0;
 
     // remove virtual address from the TLB
     tlb_invalidate(pgdir, va);
