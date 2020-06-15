@@ -1,4 +1,8 @@
 /* See COPYRIGHT for copyright information. */
+#ifndef UINT_MAX
+#define UINT_MAX 4294967295
+#endif
+
 
 #include <inc/x86.h>
 #include <inc/mmu.h>
@@ -195,7 +199,7 @@ mem_init(void)
 	//    - pages itself -- kernel RW, user NONE
 	// Your code goes here:
 
-	boot_map_region(kern_pgdir, (uintptr_t)pages, PTSIZE, UPAGES, PTE_W);
+	boot_map_region(kern_pgdir, UPAGES, PTSIZE, (uintptr_t)PADDR(pages), PTE_W);
 
 
 	//////////////////////////////////////////////////////////////////////
@@ -210,6 +214,9 @@ mem_init(void)
 	//     Permissions: kernel RW, user NONE
 	// Your code goes here:
 
+    boot_map_region(kern_pgdir, KSTACKTOP-KSTKSIZE, KSTKSIZE, (uintptr_t)PADDR(bootstack), PTE_W);
+    // boot_map_region(kern_pgdir, KSTACKTOP-PTSIZE, 0, (uintptr_t)PADDR(), PTE_W); <- Esto no va porque justamente el "no mapeo" a memoria fisica se hace literalmente no mapeado
+
 	//////////////////////////////////////////////////////////////////////
 	// Map all of physical memory at KERNBASE.
 	// Ie.  the VA range [KERNBASE, 2^32) should map to
@@ -218,6 +225,8 @@ mem_init(void)
 	// we just set up the mapping anyway.
 	// Permissions: kernel RW, user NONE
 	// Your code goes here:
+
+    boot_map_region(kern_pgdir, KERNBASE, UINT_MAX - KERNBASE, (uintptr_t)0, PTE_W);
 
 	// Check that the initial page directory has been set up correctly.
 	check_kern_pgdir();
@@ -433,7 +442,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
         // link page directory with page table
         physaddr_t pa = page2pa(pg);
 
-        pgdir[pdi] = (pte_t)PGADDR(PDX(pa), PTX(pa), PGOFF(PTE_U|PTE_P));
+        pgdir[pdi] = (pte_t)PGADDR(PDX(pa), PTX(pa), PGOFF(PTE_U|PTE_P|PTE_W));
     }
 
     // Page Table virtual address
@@ -460,7 +469,7 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 	pte_t* pte;
 
     for(uintptr_t i=0; i < size/4; ++i){
-        pte = pgdir_walk(pgdir, (void *)va + i, 1);
+        pte = pgdir_walk(pgdir, (void *)(va + i*4), 1);
         *pte = (pte_t)PGADDR(PDX(pa+i*4), PTX(pa+i*4), PGOFF(perm|PTE_P));
     }
 
