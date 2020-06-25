@@ -19,7 +19,7 @@ end = 0xf0118950.
 (Direccion obtenida mediante el comando nm obj/kern/kernel).
 
 Luego, la primera vez que se llama a boot_alloc se inicaliza el valor de la variable
-estatica nextfree con el la siguiente instruccion:
+estatica nextfree con la siguiente instruccion:
 
 nextfree = ROUNDUP((char *) end, PGSIZE);
 Es decir, el valor de end alineado a PGSIZE. PGSIZE tiene un tamano de 0x1000
@@ -28,9 +28,9 @@ Es decir, el valor de end alineado a PGSIZE. PGSIZE tiene un tamano de 0x1000
 
 entonces redondeando hacia arriba -> nextfree = 0xf0118950 + 0x1000 - 0x950 = 0xf0119000
 
-##Una sesión de GDB en la que, poniendo un breakpoint en la función boot_alloc(), se muestre el valor de end y nextfree al comienzo y fin de esa primera llamada a boot_alloc().
+## Una sesión de GDB en la que, poniendo un breakpoint en la función boot_alloc(), se muestre el valor de end y nextfree al comienzo y fin de esa primera llamada a boot_alloc().
 
-Al comienzo de la primer llamada, nextfree toma el valor 0 (ya que todas las variables estaticas en C se inicializan a ese valor por defecto). Al salir, nextfree queda actualizada con su valor al cual es inicializa (end) sumado a la cantidad de paginas necesarias para guardar el array de paginas libres.
+Al comienzo de la primer llamada, nextfree toma el valor 0 (ya que todas las variables estaticas en C se inicializan a ese valor por defecto). Al salir, nextfree queda actualizada con el valor de end (alineado a PGSIZE) sumado a la cantidad de paginas necesarias para guardar el array de paginas libres.
 
 nextfree = ROUNDUP((char *) end, PGSIZE) + PGSIZE;
 
