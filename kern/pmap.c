@@ -213,9 +213,8 @@ mem_init(void)
 	//       overwrite memory.  Known as a "guard page".
 	//     Permissions: kernel RW, user NONE
 	// Your code goes here:
-
-    boot_map_region(kern_pgdir, KSTACKTOP-KSTKSIZE, KSTKSIZE, (uintptr_t)PADDR(bootstack), PTE_W);
-    // boot_map_region(kern_pgdir, KSTACKTOP-PTSIZE, 0, (uintptr_t)PADDR(), PTE_W); <- Esto no va porque justamente el "no mapeo" a memoria fisica se hace literalmente no mapeado
+    boot_map_region(kern_pgdir, KSTACKTOP - KSTKSIZE, KSTKSIZE,
+                    (uintptr_t)PADDR(bootstack), PTE_W);
 
 	//////////////////////////////////////////////////////////////////////
 	// Map all of physical memory at KERNBASE.
@@ -226,7 +225,8 @@ mem_init(void)
 	// Permissions: kernel RW, user NONE
 	// Your code goes here:
 
-    boot_map_region(kern_pgdir, KERNBASE, UINT_MAX - KERNBASE, (uintptr_t)0, PTE_W);
+    boot_map_region(kern_pgdir, KERNBASE, UINT_MAX - KERNBASE,
+                    (uintptr_t)0, PTE_W);
 
 	// Check that the initial page directory has been set up correctly.
 	check_kern_pgdir();
@@ -394,6 +394,15 @@ page_decref(struct PageInfo *pp)
 		page_free(pp);
 }
 
+//
+// Return true if a page table entry
+// is present
+//
+static int
+entry_present(pte_t pte) {
+    return pte & PTE_P;
+}
+
 // Given 'pgdir', a pointer to a page directory, pgdir_walk returns
 // a pointer to the page table entry (PTE) for linear address 'va'.
 // This requires walking the two-level page table structure.
@@ -425,9 +434,9 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
     uint32_t pti = PTX(va);
 
     // Page Table physical address
-    pte_t* pgtab = (pte_t *)pgdir[pdi];
+    pte_t pgtab = pgdir[pdi];
 
-    if (!pgtab) {
+    if (!entry_present(pgtab)) {
         // dont create a new page
         if (!create) return NULL;
 
@@ -468,9 +477,18 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 {
 	pte_t* pte;
 
-    for(uintptr_t i=0; i < size/4; ++i){
-        pte = pgdir_walk(pgdir, (void *)(va + i*4), 1);
-        *pte = (pte_t)PGADDR(PDX(pa+i*4), PTX(pa+i*4), PGOFF(perm|PTE_P));
+
+    // pa is page aligned
+    // va is page aligne
+
+    // size is multiple of PGSIZE. Iterate over n pages to intialize
+    for (int i = 0; i < size / PGSIZE; i++) {
+        pte = pgdir_walk(pgdir, (void *)va, 1);
+
+        *pte = (pte_t)PGADDR(PDX(pa), PTX(pa), PGOFF(perm|PTE_P));
+
+        va += PGSIZE; // next virtual page
+        pa += PGSIZE; // next physical page
     }
 
 }
@@ -514,7 +532,7 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
     pp->pp_ref++;
 
     // if page exists then the page is removed
-    if (*pte) page_remove(pgdir, va);
+    if (entry_present(*pte)) page_remove(pgdir, va);
 
     // physacal address of the physycal page
     physaddr_t pa = page2pa(pp);
@@ -542,7 +560,8 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
     // pte ---> Physical Address
 	pte_t* pte = pgdir_walk(pgdir, va, 0);
 
-	if (!pte) return NULL;
+	if (!pte || !entry_present(*pte))
+        return NULL;
 
 	if (pte_store) *pte_store = pte;
 
@@ -576,7 +595,7 @@ page_remove(pde_t *pgdir, void *va)
     // page is free if the refcount reaches 0.
     page_decref(pg);
 
-    if (pte) (*pte) = 0;
+    if (entry_present(*pte)) (*pte) = 0;
 
     // remove virtual address from the TLB
     tlb_invalidate(pgdir, va);
