@@ -42,12 +42,11 @@ Ahora viendo con GDB vemos que:
 b boot_alloc
 b kern/pmap.c:128
 c
-p nextfree -> $1 = 0x0
-printf "%08x\n", (unsigned)end -> 0xf0119850
+p/x nextfree -> $1 = 0x0
+p/x end -> $2 = 0xf0119850
 c
-p nextfree -> $2 = 0xf011a000
-p end -> $4 = 0xf0119850
-
+p/x nextfree -> $3 = 0xf011a000
+p/x &end -> $4 = 0xf0118950
 
 
 # page_alloc
