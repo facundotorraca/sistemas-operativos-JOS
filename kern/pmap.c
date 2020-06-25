@@ -111,7 +111,7 @@ boot_alloc(uint32_t n)
 	// to a multiple of PGSIZE.
 
     // max memory address
-    uint32_t max_memaddr = (npages * PGSIZE) + KERNBASE;
+    uint32_t max_memaddr = UINT_MAX; // 4mb
 
     uint32_t bytes_to_alloc = ROUNDUP(n, PGSIZE);
     uint32_t pages_to_alloc = bytes_to_alloc / PGSIZE;
