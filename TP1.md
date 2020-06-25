@@ -9,14 +9,11 @@ page2pa
 
 ## Un cálculo manual de la primera dirección de memoria que devolverá boot_alloc() tras el arranque
 
-Imprime la posicion f0119000.
-
-0xf0119000 es una direccion virtual.
+La direccion que devuelve el primer llamado a boot_alloc será 0xf0119000 (dirección virtual).
 
 Para entender el motivo de este valor partimos de que la direccion de end es:
 
-end = 0xf0118950.
-(Direccion obtenida mediante el comando nm obj/kern/kernel).
+end = 0xf0118950 (Direccion obtenida mediante el comando nm obj/kern/kernel).
 
 Luego, la primera vez que se llama a boot_alloc se inicaliza el valor de la variable
 estatica nextfree con la siguiente instruccion:
@@ -26,7 +23,9 @@ Es decir, el valor de end alineado a PGSIZE. PGSIZE tiene un tamano de 0x1000
 
 0xf0118950 mod 0x1000 = 0x950
 
-entonces redondeando hacia arriba -> nextfree = 0xf0118950 + 0x1000 - 0x950 = 0xf0119000
+Entonces redondeando hacia arriba -> nextfree = 0xf0118950 + 0x1000 - 0x950 = 0xf0119000
+
+Finalmente boot_alloc() devuelve en su primer llamado el valor con que se inicializó nextfree (la direccion virtual mencionada 0xf0119000).
 
 ## Una sesión de GDB en la que, poniendo un breakpoint en la función boot_alloc(), se muestre el valor de end y nextfree al comienzo y fin de esa primera llamada a boot_alloc().
 
@@ -44,8 +43,12 @@ b boot_alloc
 b kern/pmap.c:128
 c
 p nextfree -> $1 = 0x0
+printf "%08x\n", (unsigned)end -> 0xf0119850
 c
 p nextfree -> $2 = 0xf011a000
+p end -> $4 = 0xf0119850
+
+
 
 # page_alloc
 ----------
@@ -54,3 +57,4 @@ p nextfree -> $2 = 0xf011a000
 
 Ambos reciben un puntero a struct* PageInfo referido a una pagina en memoria.
 page2pa por su parte devuelve la direccion fisica de inicio donde esta mapeada la pagina, mientras que page2kva devuelve la direccion virtual vinculada a la direccion fisica de inicio de la pagina (la misma que devuelve page2pa).
+
