@@ -4,13 +4,10 @@ TP1: Memoria virtual en JOS
 page2pa
 -------
 
-...
-
-
-#boot_alloc_pos
+# boot_alloc_pos
 --------------
 
-##Un cálculo manual de la primera dirección de memoria que devolverá boot_alloc() tras el arranque
+## Un cálculo manual de la primera dirección de memoria que devolverá boot_alloc() tras el arranque
 
 Imprime la posicion f0119000.
 
@@ -27,7 +24,8 @@ estatica nextfree con el la siguiente instruccion:
 nextfree = ROUNDUP((char *) end, PGSIZE);
 Es decir, el valor de end alineado a PGSIZE. PGSIZE tiene un tamano de 0x1000
 
-0xf0118950 mod 0x1000 = 0x950  
+0xf0118950 mod 0x1000 = 0x950
+
 entonces redondeando hacia arriba -> nextfree = 0xf0118950 + 0x1000 - 0x950 = 0xf0119000
 
 ##Una sesión de GDB en la que, poniendo un breakpoint en la función boot_alloc(), se muestre el valor de end y nextfree al comienzo y fin de esa primera llamada a boot_alloc().
@@ -49,10 +47,10 @@ p nextfree -> $1 = 0x0
 c
 p nextfree -> $2 = 0xf011a000
 
-#page_alloc
+# page_alloc
 ----------
 
-##¿en qué se diferencia page2pa() de page2kva()?
+## ¿en qué se diferencia page2pa() de page2kva()?
 
 Ambos reciben un puntero a struct* PageInfo referido a una pagina en memoria.
 page2pa por su parte devuelve la direccion fisica de inicio donde esta mapeada la pagina, mientras que page2kva devuelve la direccion virtual vinculada a la direccion fisica de inicio de la pagina (la misma que devuelve page2pa).
