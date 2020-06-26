@@ -1,8 +1,6 @@
 /* See COPYRIGHT for copyright information. */
-#ifndef UINT_MAX
-#define UINT_MAX 4294967295
-#endif
-
+#define UINT_MAX 4294967295 //4*1024*1024*1024
+#define LG_PGSIZE 4194304 //4*1024*1024
 
 #include <inc/x86.h>
 #include <inc/mmu.h>
@@ -494,8 +492,47 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 #else
     // pa is page aligned
     // va is page aligned
-    pte_t* pte = pgdir_walk(pgdir, (void *)va, 1);
-    *pte = (pte_t)PGADDR(PDX(pa), PTX(pa), PGOFF(perm|PTE_P|PTE_PS));
+    pte_t* pte;
+    physaddr_t pa_aux;
+
+    //pte_t* pte = pgdir_walk(pgdir, (void *)va, 1);
+    //*pte = (pte_t)PGADDR(PDX(pa), PTX(pa), PGOFF(perm|PTE_P|PTE_PS));
+
+    //if PA isnt aligned to Large Page Size i assign normal page entries until PA is aligned to
+    //Large page size and if SIZE_LEFT is > Large_pgsize then i assign a large page, else set normal pages (repeat
+    //until size == 0).
+
+    if (pa % LG_PGSIZE != 0){
+        pa_aux = pa;
+        for (int i = 0; i < (pa_aux % LG_PGSIZE) / PGSIZE; i++) {
+            pte = pgdir_walk(pgdir, (void *)va, 1);
+
+            *pte = (pte_t)PGADDR(PDX(pa), PTX(pa), PGOFF(perm|PTE_P));
+
+            va += PGSIZE; // next virtual page
+            pa += PGSIZE; // next physical page
+        }
+        size -= (pa_aux % LG_PGSIZE);
+    }
+    while (size > 0){
+        if (size > LG_PGSIZE){
+            pte_t* pte = pgdir_walk(pgdir, (void *)va, 1);
+            *pte = (pte_t)PGADDR(PDX(pa), PTX(pa), PGOFF(perm|PTE_P|PTE_PS));
+            size -= LG_PGSIZE;
+        } else{
+            pa_aux = pa;
+            for (int i = 0; i < (pa_aux % LG_PGSIZE) / PGSIZE; i++) {
+                pte = pgdir_walk(pgdir, (void *)va, 1);
+
+                *pte = (pte_t)PGADDR(PDX(pa), PTX(pa), PGOFF(perm|PTE_P));
+
+                va += PGSIZE; // next virtual page
+                pa += PGSIZE; // next physical page
+            }
+            size = 0;
+        }
+    }
+
 
 #endif //TP1_PSE
 }
