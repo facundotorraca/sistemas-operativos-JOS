@@ -26,8 +26,8 @@ pde_t entry_pgdir[NPDENTRIES] = {
 	// Map VA's [KERNBASE, KERNBASE+4MB) to PA's [0, 4MB)
 	[KERNBASE>>PDXSHIFT]
 		= ((uintptr_t)entry_pgtable - KERNBASE) + PTE_P + PTE_W
-
     */
+
     [0] = PTE_P + PTE_PS,
     [KERNBASE>>PDXSHIFT] = PTE_P + PTE_W + PTE_PS
 };

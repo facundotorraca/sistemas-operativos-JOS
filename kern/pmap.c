@@ -1,4 +1,5 @@
 /* See COPYRIGHT for copyright information. */
+
 #define UINT_MAX 4294967295 //4*1024*1024*1024
 #define LG_PGSIZE 4194304 //4*1024*1024
 
@@ -222,8 +223,7 @@ mem_init(void)
 	// we just set up the mapping anyway.
 	// Permissions: kernel RW, user NONE
 	// Your code goes here:
-
-    boot_map_region(kern_pgdir, KERNBASE, UINT_MAX - KERNBASE,
+    boot_map_region(kern_pgdir, KERNBASE, ROUNDUP(UINT_MAX - KERNBASE, PGSIZE),
                     (uintptr_t)0, PTE_W);
 
 	// Check that the initial page directory has been set up correctly.
@@ -473,8 +473,10 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 static void
 boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
 {
+
 #ifndef TP1_PSE
-	pte_t* pte;
+
+    pte_t* pte;
 
     // pa is page aligned
     // va is page aligned
@@ -490,50 +492,48 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
     }
 
 #else
+
     // pa is page aligned
     // va is page aligned
     pte_t* pte;
-    physaddr_t pa_aux;
 
-    //pte_t* pte = pgdir_walk(pgdir, (void *)va, 1);
-    //*pte = (pte_t)PGADDR(PDX(pa), PTX(pa), PGOFF(perm|PTE_P|PTE_PS));
+    cprintf("size: %08x\n", size);
 
-    //if PA isnt aligned to Large Page Size i assign normal page entries until PA is aligned to
-    //Large page size and if SIZE_LEFT is > Large_pgsize then i assign a large page, else set normal pages (repeat
-    //until size == 0).
+    while ((pa % LG_PGSIZE != 0) && (size > 0)) {
+        pte = pgdir_walk(pgdir, (void *)va, 1);
+        *pte = (pte_t)PGADDR(PDX(pa), PTX(pa), PGOFF(perm|PTE_P));
 
-    if (pa % LG_PGSIZE != 0){
-        pa_aux = pa;
-        for (int i = 0; i < (pa_aux % LG_PGSIZE) / PGSIZE; i++) {
-            pte = pgdir_walk(pgdir, (void *)va, 1);
+        va += PGSIZE; // next virtual page
+        pa += PGSIZE; // next physical page
 
-            *pte = (pte_t)PGADDR(PDX(pa), PTX(pa), PGOFF(perm|PTE_P));
-
-            va += PGSIZE; // next virtual page
-            pa += PGSIZE; // next physical page
-        }
-        size -= (pa_aux % LG_PGSIZE);
-    }
-    while (size > 0){
-        if (size > LG_PGSIZE){
-            pte_t* pte = pgdir_walk(pgdir, (void *)va, 1);
-            *pte = (pte_t)PGADDR(PDX(pa), PTX(pa), PGOFF(perm|PTE_P|PTE_PS));
-            size -= LG_PGSIZE;
-        } else{
-            pa_aux = pa;
-            for (int i = 0; i < (pa_aux % LG_PGSIZE) / PGSIZE; i++) {
-                pte = pgdir_walk(pgdir, (void *)va, 1);
-
-                *pte = (pte_t)PGADDR(PDX(pa), PTX(pa), PGOFF(perm|PTE_P));
-
-                va += PGSIZE; // next virtual page
-                pa += PGSIZE; // next physical page
-            }
-            size = 0;
-        }
+        size -= PGSIZE;
     }
 
+    cprintf("size: %08x\n", size);
 
+    while (size >= LG_PGSIZE) {
+        pte_t* pte = pgdir_walk(pgdir, (void *)va, 1);
+        *pte = (pte_t)PGADDR(PDX(pa), PTX(pa), PGOFF(perm|PTE_P|PTE_PS));
+
+        va += LG_PGSIZE;
+        pa += LG_PGSIZE;
+
+        size -= LG_PGSIZE;
+    }
+
+    cprintf("size: %08x\n", size);
+
+    while (size > 0) {
+        pte = pgdir_walk(pgdir, (void *)va, 1);
+        *pte = (pte_t)PGADDR(PDX(pa), PTX(pa), PGOFF(perm|PTE_P));
+
+        va += PGSIZE; // next virtual page
+        pa += PGSIZE; // next physical page
+
+        size -= PGSIZE;
+    }
+
+    cprintf("size: %08x\n\n\n", size);
 #endif //TP1_PSE
 }
 
