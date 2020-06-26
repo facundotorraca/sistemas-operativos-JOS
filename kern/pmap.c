@@ -475,11 +475,11 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 static void
 boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
 {
+#ifndef TP1_PSE
 	pte_t* pte;
 
-
     // pa is page aligned
-    // va is page aligne
+    // va is page aligned
 
     // size is multiple of PGSIZE. Iterate over n pages to intialize
     for (int i = 0; i < size / PGSIZE; i++) {
@@ -491,6 +491,13 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
         pa += PGSIZE; // next physical page
     }
 
+#else
+    // pa is page aligned
+    // va is page aligned
+    pte_t* pte = pgdir_walk(pgdir, (void *)va, 1);
+    *pte = (pte_t)PGADDR(PDX(pa), PTX(pa), PGOFF(perm|PTE_P|PTE_PS));
+
+#endif //TP1_PSE
 }
 
 //
