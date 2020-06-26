@@ -1,7 +1,7 @@
 /* See COPYRIGHT for copyright information. */
 
-#define UINT_MAX 4294967295 //4*1024*1024*1024
-#define LG_PGSIZE 4194304 //4*1024*1024
+#define UINT_MAX 4294967295 //4*1024*1024*1024 4gb
+#define LG_PGSIZE 4194304 //4*1024*1024 4mb
 
 #include <inc/x86.h>
 #include <inc/mmu.h>
@@ -60,7 +60,6 @@ i386_detect_memory(void)
 	        basemem,
 	        totalmem - basemem);
 }
-
 
 // --------------------------------------------------------------
 // Set up memory mappings above UTOP.
@@ -473,14 +472,12 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 static void
 boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
 {
-
-#ifndef TP1_PSE
-
     pte_t* pte;
 
     // pa is page aligned
     // va is page aligned
 
+#ifndef TP1_PSE
     // size is multiple of PGSIZE. Iterate over n pages to intialize
     for (int i = 0; i < size / PGSIZE; i++) {
         pte = pgdir_walk(pgdir, (void *)va, 1);
@@ -490,15 +487,7 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
         va += PGSIZE; // next virtual page
         pa += PGSIZE; // next physical page
     }
-
 #else
-
-    // pa is page aligned
-    // va is page aligned
-    pte_t* pte;
-
-    cprintf("size: %08x\n", size);
-
     while ((pa % LG_PGSIZE != 0) && (size > 0)) {
         pte = pgdir_walk(pgdir, (void *)va, 1);
         *pte = (pte_t)PGADDR(PDX(pa), PTX(pa), PGOFF(perm|PTE_P));
@@ -509,19 +498,14 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
         size -= PGSIZE;
     }
 
-    cprintf("size: %08x\n", size);
-
     while (size >= LG_PGSIZE) {
-        pte_t* pte = pgdir_walk(pgdir, (void *)va, 1);
-        *pte = (pte_t)PGADDR(PDX(pa), PTX(pa), PGOFF(perm|PTE_P|PTE_PS));
+        pgdir[PDX(va)] = (pte_t)PGADDR(PDX(pa), PTX(pa), PGOFF(perm|PTE_P|PTE_PS));
 
         va += LG_PGSIZE;
         pa += LG_PGSIZE;
 
         size -= LG_PGSIZE;
     }
-
-    cprintf("size: %08x\n", size);
 
     while (size > 0) {
         pte = pgdir_walk(pgdir, (void *)va, 1);
@@ -532,9 +516,8 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 
         size -= PGSIZE;
     }
-
-    cprintf("size: %08x\n\n\n", size);
 #endif //TP1_PSE
+
 }
 
 //
