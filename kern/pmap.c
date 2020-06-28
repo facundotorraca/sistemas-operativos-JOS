@@ -474,20 +474,6 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 {
     pte_t* pte;
 
-    // pa is page aligned
-    // va is page aligned
-
-#ifndef TP1_PSE
-    // size is multiple of PGSIZE. Iterate over n pages to intialize
-    for (int i = 0; i < size / PGSIZE; i++) {
-        pte = pgdir_walk(pgdir, (void *)va, 1);
-
-        *pte = (pte_t)PGADDR(PDX(pa), PTX(pa), PGOFF(perm|PTE_P));
-
-        va += PGSIZE; // next virtual page
-        pa += PGSIZE; // next physical page
-    }
-#else
     while ((pa % LG_PGSIZE != 0) && (size > 0)) {
         pte = pgdir_walk(pgdir, (void *)va, 1);
         *pte = (pte_t)PGADDR(PDX(pa), PTX(pa), PGOFF(perm|PTE_P));
@@ -498,6 +484,8 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
         size -= PGSIZE;
     }
 
+#ifdef TP1_PSE // Large pages activated
+
     while (size >= LG_PGSIZE) {
         pgdir[PDX(va)] = (pte_t)PGADDR(PDX(pa), PTX(pa), PGOFF(perm|PTE_P|PTE_PS));
 
@@ -506,6 +494,8 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 
         size -= LG_PGSIZE;
     }
+
+#endif //TP1_PSE
 
     while (size > 0) {
         pte = pgdir_walk(pgdir, (void *)va, 1);
@@ -516,8 +506,6 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 
         size -= PGSIZE;
     }
-#endif //TP1_PSE
-
 }
 
 //
