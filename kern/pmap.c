@@ -3,8 +3,6 @@
 #define UINT_MAX 4294967295 //4*1024*1024*1024 4gb
 #define LG_PGSIZE 4194304 //4*1024*1024 4mb
 
-#define TP1_PSE 1
-
 #include <inc/x86.h>
 #include <inc/mmu.h>
 #include <inc/error.h>
