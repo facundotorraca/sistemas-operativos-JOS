@@ -10,13 +10,13 @@ Se ahorro 4Kb (una Page Table completa) por cada "large page" mapeada directamen
 
 La funcion boot_map_region se llama 3 veces en mem_init:
 
-* boot_map_region(kern_pgdir, UPAGES, PTSIZE, (uintptr_t)PADDR(pages), PTE_W);
+* boot_map_region(kern_pgdir, UPAGES, PTSIZE, (uintptr_t)PADDR(pages), PTE_U | PTE_P);
 
-En este caso no se agrega una large page, ya que UPAGES esta alineada pero la direccion fisica pages no lo esta (va = 0x001aa000).
+En este caso no se agrega una large page, ya que UPAGES esta alineada pero la direccion fisica pages no lo esta (pa = 0x001aa000).
 
 * boot_map_region(kern_pgdir, KSTACKTOP - KSTKSIZE, KSTKSIZE,                                (uintptr_t)PADDR(bootstack),PTE_W);
 
-En este caso tampoco no se utiliza una large page ya que la cantidad de memoria mapeada es inferior a 4Mb.
+En este caso tampoco no se utiliza una large page ya que la cantidad de memoria mapeada es inferior a 4Mb (KSTKSIZE = 8*PGSIZE = 8*4096 = 32Kb).
 
 * boot_map_region(kern_pgdir, KERNBASE, ROUNDUP(UINT_MAX - KERNBASE, PGSIZE), (uintptr_t)0, PTE_W);
 
@@ -25,11 +25,7 @@ En este caso si se utilizara large pages, ya que se piden mapear 256 MB de memor
 Al mapear directamente desde el Page Directory, nos ahorramos una Page Table por cada entrada.
 Cada Page Table puede mapear a 1024 Paginas de 4Kb, es decir a 4Mb. Por lo tanto, por cada large page, se ahorra una page table (4kB). Como se usan 64 large pages (256Mb/4Mb), se ahorran un total de 64 * 4kb = 256 Kb.
 
-
-
-
-Este mapeo ocurre cuando se mapea toda la memoria fisica del kernel a las direcciones altas, por lo que se estaria remapeando 256Mb, por lo tanto, las 64 large pages mencionadas. El ahorro total de memoria es de 256 kb (4kb * 64).
-
+Esta cantidad no varia, dado que por mas que tengamos una cantidad inferior a 256Mb de memoria fisica, el mapeo se realiza de igual manera, ya que sera en las funciones page_init() y page_alloc() mira la cantidad de memoria disponible, y page_alloc()
 
 # boot_alloc_pos
 --------------
