@@ -199,7 +199,8 @@ mem_init(void)
 	//    - the new image at UPAGES -- kernel R, user R
 	//      (ie. perm = PTE_U | PTE_P)
 	//    - pages itself -- kernel RW, user NONE
-	boot_map_region(kern_pgdir, UPAGES, PTSIZE, (uintptr_t)PADDR(pages), PTE_W);
+	boot_map_region(kern_pgdir, UPAGES, PTSIZE, (uintptr_t)PADDR(pages),
+                    PTE_U | PTE_P);
 
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
@@ -222,7 +223,7 @@ mem_init(void)
 	// we just set up the mapping anyway.
 	// Permissions: kernel RW, user NONE
     boot_map_region(kern_pgdir, KERNBASE, ROUNDUP(UINT_MAX - KERNBASE, PGSIZE),
-                    (uintptr_t)0, PTE_W);
+                    (physaddr_t)0, PTE_W);
 
 	// Check that the initial page directory has been set up correctly.
 	check_kern_pgdir();
