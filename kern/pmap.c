@@ -12,8 +12,6 @@
 #include <kern/pmap.h>
 #include <kern/kclock.h>
 
-static int pages_created = 0;
-
 // These variables are set by i386_detect_memory()
 size_t npages;                 // Amount of physical memory (in pages)
 static size_t npages_basemem;  // Amount of base memory (in pages)
@@ -495,8 +493,6 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 #ifdef TP1_PSE // Large pages activated
 
     while (size >= LG_PGSIZE) {
-        pages_created++;
-
         pgdir[PDX(va)] = (pte_t)PGADDR(PDX(pa), PTX(pa), PGOFF(perm|PTE_P|PTE_PS));
 
         va += LG_PGSIZE;
