@@ -3,6 +3,8 @@
 #define UINT_MAX 4294967295 //4*1024*1024*1024 4gb
 #define LG_PGSIZE 4194304 //4*1024*1024 4mb
 
+#define TP1_PSE 1
+
 #include <inc/x86.h>
 #include <inc/mmu.h>
 #include <inc/error.h>
@@ -11,6 +13,8 @@
 
 #include <kern/pmap.h>
 #include <kern/kclock.h>
+
+static int pages_created = 0;
 
 // These variables are set by i386_detect_memory()
 size_t npages;                 // Amount of physical memory (in pages)
@@ -109,7 +113,7 @@ boot_alloc(uint32_t n)
 	// to a multiple of PGSIZE.
 
     // max memory address
-    uint32_t max_memaddr = UINT_MAX; // 4mb
+    uint32_t max_memaddr = UINT_MAX;
 
     uint32_t bytes_to_alloc = ROUNDUP(n, PGSIZE);
     uint32_t pages_to_alloc = bytes_to_alloc / PGSIZE;
@@ -195,10 +199,7 @@ mem_init(void)
 	//    - the new image at UPAGES -- kernel R, user R
 	//      (ie. perm = PTE_U | PTE_P)
 	//    - pages itself -- kernel RW, user NONE
-	// Your code goes here:
-
 	boot_map_region(kern_pgdir, UPAGES, PTSIZE, (uintptr_t)PADDR(pages), PTE_W);
-
 
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
@@ -210,7 +211,6 @@ mem_init(void)
 	//       the kernel overflows its stack, it will fault rather than
 	//       overwrite memory.  Known as a "guard page".
 	//     Permissions: kernel RW, user NONE
-	// Your code goes here:
     boot_map_region(kern_pgdir, KSTACKTOP - KSTKSIZE, KSTKSIZE,
                     (uintptr_t)PADDR(bootstack), PTE_W);
 
@@ -221,7 +221,6 @@ mem_init(void)
 	// We might not have 2^32 - KERNBASE bytes of physical memory, but
 	// we just set up the mapping anyway.
 	// Permissions: kernel RW, user NONE
-	// Your code goes here:
     boot_map_region(kern_pgdir, KERNBASE, ROUNDUP(UINT_MAX - KERNBASE, PGSIZE),
                     (uintptr_t)0, PTE_W);
 
@@ -459,6 +458,16 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 }
 
 //
+// Recieves an virtaul address (va) and a physical
+// address (pa) and returns true if both are
+// aligned to a large page.
+//
+static int
+addr_lpage_aligned(uintptr_t va, physaddr_t pa) {
+    return (pa % LG_PGSIZE == 0) && (va % LG_PGSIZE == 0);
+}
+
+//
 // Map [va, va+size) of virtual address space to physical [pa, pa+size)
 // in the page table rooted at pgdir.  Size is a multiple of PGSIZE, and
 // va and pa are both page-aligned.
@@ -474,7 +483,7 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 {
     pte_t* pte;
 
-    while ((pa % LG_PGSIZE != 0) && (size > 0)) {
+    while (!addr_lpage_aligned(va, pa) && (size > 0)) {
         pte = pgdir_walk(pgdir, (void *)va, 1);
         *pte = (pte_t)PGADDR(PDX(pa), PTX(pa), PGOFF(perm|PTE_P));
 
@@ -487,6 +496,8 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 #ifdef TP1_PSE // Large pages activated
 
     while (size >= LG_PGSIZE) {
+        pages_created++;
+
         pgdir[PDX(va)] = (pte_t)PGADDR(PDX(pa), PTX(pa), PGOFF(perm|PTE_P|PTE_PS));
 
         va += LG_PGSIZE;

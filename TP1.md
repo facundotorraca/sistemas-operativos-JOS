@@ -1,8 +1,35 @@
 TP1: Memoria virtual en JOS
 ===========================
 
-page2pa
+# boot_map_region
 -------
+
+## ¿cuánta memoria se ahorró de este modo? ¿Es una cantidad fija, o depende de la memoria física de la computadora?
+
+Se ahorro 4Kb (una Page Table completa) por cada "large page" mapeada directamente al "page directory". Se mapean un total de 64 large pages.
+
+La funcion boot_map_region se llama 3 veces en mem_init:
+
+* boot_map_region(kern_pgdir, UPAGES, PTSIZE, (uintptr_t)PADDR(pages), PTE_W);
+
+En este caso no se agrega una large page, ya que UPAGES esta alineada pero la direccion fisica pages no lo esta (va = 0x001aa000).
+
+* boot_map_region(kern_pgdir, KSTACKTOP - KSTKSIZE, KSTKSIZE,                                (uintptr_t)PADDR(bootstack),PTE_W);
+
+En este caso tampoco no se utiliza una large page ya que la cantidad de memoria mapeada es inferior a 4Mb.
+
+* boot_map_region(kern_pgdir, KERNBASE, ROUNDUP(UINT_MAX - KERNBASE, PGSIZE), (uintptr_t)0, PTE_W);
+
+En este caso si se utilizara large pages, ya que se piden mapear 256 MB de memoria, mapeando desde la direccion fisica 0x0 (que si esta alineada a 4Mb) en la direccion virtual KERNBASE (0xF0000000), que tambien esta alineada.
+
+Al mapear directamente desde el Page Directory, nos ahorramos una Page Table por cada entrada.
+Cada Page Table puede mapear a 1024 Paginas de 4Kb, es decir a 4Mb. Por lo tanto, por cada large page, se ahorra una page table (4kB). Como se usan 64 large pages (256Mb/4Mb), se ahorran un total de 64 * 4kb = 256 Kb.
+
+
+
+
+Este mapeo ocurre cuando se mapea toda la memoria fisica del kernel a las direcciones altas, por lo que se estaria remapeando 256Mb, por lo tanto, las 64 large pages mencionadas. El ahorro total de memoria es de 256 kb (4kb * 64).
+
 
 # boot_alloc_pos
 --------------
@@ -56,4 +83,3 @@ p/x &end -> $4 = 0xf0118950
 
 Ambos reciben un puntero a struct* PageInfo referido a una pagina en memoria.
 page2pa por su parte devuelve la direccion fisica de inicio donde esta mapeada la pagina, mientras que page2kva devuelve la direccion virtual vinculada a la direccion fisica de inicio de la pagina (la misma que devuelve page2pa).
-
