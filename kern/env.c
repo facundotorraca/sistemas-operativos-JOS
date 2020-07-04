@@ -181,7 +181,11 @@ env_setup_vm(struct Env *e)
 	//    - The functions in kern/pmap.h are handy.
 
 	e->env_pgdir = page2kva(p);
+
     p->pp_ref++;
+
+    // initialize page 'p' using kern_pgdir as template
+    memcpy(page2kva(p), kern_pgdir, PGSIZE);
 
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
