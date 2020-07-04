@@ -275,20 +275,25 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   'va' and 'len' values that are not page-aligned.
 	//   You should round va down, and round (va + len) up.
 	//   (Watch out for corner-cases!)
-	va = (void *)(ROUNDDOWN((uintptr_t)va, PGSIZE));
-	len = (size_t)(ROUNDUP((uintptr_t)va + len, PGSIZE) - (uintptr_t)va);
-    struct PageInfo *env_page;
-    int insert_result = 0;
-	while ((env_page = page_alloc()) && len > 0 && insert_result == 0) {
-	    insert_result = page_insert(e->env_pgdir, env_page, va, PTE_U | PTE_W );
-	    if (insert_result == 0) {
-	        va = (void*)((uintptr_t)va + PGSIZE);
-	    }
-	}
-	if(!env_page || (insert_result != 0)){
-	    panic("Env region allocation failed!\n");
-	}
 
+    va = (void *)(ROUNDDOWN((uintptr_t)va, PGSIZE));
+
+    len = (size_t)(ROUNDUP((uintptr_t)va + len, PGSIZE) - (uintptr_t)va);
+
+    struct PageInfo* env_page;
+
+    int insert_result = 0;
+
+    while ((env_page = page_alloc(0)) && len > 0 && insert_result == 0) {
+
+        insert_result = page_insert(e->env_pgdir, env_page, va, PTE_U | PTE_W);
+
+        if (insert_result == 0)
+            va = (void*)((uintptr_t)va + PGSIZE);
+    }
+
+    if(!env_page || (insert_result != 0))
+        panic("Env region allocation failed!\n");
 }
 
 //
@@ -346,10 +351,36 @@ load_icode(struct Env *e, uint8_t *binary)
 
     struct Elf* elf = (struct Elf *)binary;
 
+    if (elf->e_magic != ELF_MAGIC)
+        panic("elf magic do not match\n");
+
+    // program header begin
+	struct Proghdr* ph = (struct Proghdr *) (binary + elf->e_phoff);
+
+    // last program header address
+	struct Proghdr* eph = ph + elf->e_phnum;
+
+	while (ph < eph) {
+
+        if (ph->p_type == ELF_PROG_LOAD) {
+            // alloc memory
+            region_alloc(e, (void *)ph->p_va, ph->p_memsz);
+
+            // map memory
+            memcpy((void *)ph->p_va, (void *)(binary + ph->p_offset), ph->p_filesz);
+
+            // remaining memory cleared
+            memset((void *)(ph->p_va + ph->p_filesz), 0, ph->p_memsz - ph->p_filesz);
+        }
+
+        ph++;
+    }
+
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
 
-	// LAB 3: Your code here.
+    region_alloc(e, (void *)(USTACKTOP - PGSIZE), PGSIZE);
+    memcpy((void *)(USTACKTOP - PGSIZE), (void *)elf->e_entry, PGSIZE);
 }
 
 //
