@@ -102,6 +102,7 @@ envid2env(envid_t envid, struct Env **env_store, bool checkperm)
 	return 0;
 }
 
+//
 // Mark all environments in 'envs' as free, set their env_ids to 0,
 // and insert them into the env_free_list.
 // Make sure the environments are in the free list in the same order
@@ -112,8 +113,7 @@ void
 env_init(void)
 {
 	// Set up envs array
-    size_t i;
-    for (i = NENV - 1; i >= 0; i--) {
+    for (int i = NENV - 1; i >= 0; i--) {
         envs[i].env_id = 0;
         envs[i].env_link = env_free_list;
         env_free_list = &envs[i];
@@ -180,6 +180,7 @@ env_setup_vm(struct Env *e)
 	//	pp_ref for env_free to work correctly.
 	//    - The functions in kern/pmap.h are handy.
 
+    // assing page to environment pgae directory
 	e->env_pgdir = page2kva(p);
 
     p->pp_ref++;
