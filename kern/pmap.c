@@ -101,6 +101,7 @@ boot_alloc(uint32_t n)
 	if (!nextfree) {
 		extern char end[];
 		nextfree = ROUNDUP((char *) end, PGSIZE);
+        cprintf("%08x\n", end);
 	}
 
     if (n == 0) return nextfree;
@@ -113,7 +114,6 @@ boot_alloc(uint32_t n)
     uint32_t max_memaddr = UINT_MAX;
 
     uint32_t bytes_to_alloc = ROUNDUP(n, PGSIZE);
-    uint32_t pages_to_alloc = bytes_to_alloc / PGSIZE;
 
     // next nextfree address
     uint32_t next_nf = (uint32_t)nextfree + bytes_to_alloc;
@@ -177,7 +177,9 @@ mem_init(void)
 
 	//////////////////////////////////////////////////////////////////////
 	// Make 'envs' point to an array of size 'NENV' of 'struct Env'.
-	// LAB 3: Your code here.
+    envs = boot_alloc(sizeof(struct Env) * NENV);
+    memset(envs, 0, sizeof(struct PageInfo) * NENV);
+
 
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -209,7 +211,8 @@ mem_init(void)
 	// Permissions:
 	//    - the new image at UENVS  -- kernel R, user R
 	//    - envs itself -- kernel RW, user NONE
-	// LAB 3: Your code here.
+    boot_map_region(kern_pgdir, UENVS, PTSIZE, (uintptr_t)PADDR(envs),
+                    PTE_U | PTE_P);
 
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
@@ -278,7 +281,11 @@ is_initial_free_page(size_t pnumber)
         return 0;
 
     // Memory allocated by boot_alloc for pages array and first page
-    if (vpa >= (uint32_t)pages && vpa < (uint32_t)(pages + npages))
+    if (vpa >= (uint32_t)pages && vpa < (uint32_t)(pages + npages * sizeof(struct PageInfo)))
+        return 0;
+
+    // Memory allocated by boot_alloc fron envs array
+    if (vpa >= (uint32_t)envs && vpa < (uint32_t)(envs + NENV * sizeof(struct Env)))
         return 0;
 
     // Memory allocated for the kernel
