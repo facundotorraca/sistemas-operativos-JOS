@@ -276,17 +276,27 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   You should round va down, and round (va + len) up.
 	//   (Watch out for corner-cases!)
 
-    va = (void *)(ROUNDDOWN((uintptr_t)va, PGSIZE));
-    len = (size_t)(ROUNDUP((uintptr_t)va + len, PGSIZE) - (uintptr_t)va);
-    struct PageInfo* env_page;
-    int insert_result = 0;
-    while ((env_page = page_alloc(0)) && len > 0 && insert_result == 0) {
-        insert_result = page_insert(e->env_pgdir, env_page, va, PTE_U | PTE_W);
-        va = (void*)((uintptr_t)va + PGSIZE);
-        len -= PGSIZE;
+    uintptr_t cur_va = ROUNDDOWN((uintptr_t)va, PGSIZE);
+    uintptr_t lst_va = ROUNDUP((uintptr_t)va + len, PGSIZE);
+
+    // insert result (0 if ok)
+    int ins_r = 0;
+
+    // Page allocated for env e
+    struct PageInfo* e_page = page_alloc(0);
+
+    while (e_page && cur_va < lst_va && ins_r == 0) {
+
+        ins_r = page_insert(e->env_pgdir,
+                            e_page,
+                            (void *)cur_va,
+                            PTE_U | PTE_W);
+
+        if (ins_r == 0) cur_va += PGSIZE;
+
     }
 
-    if(!env_page || (insert_result != 0))
+    if(!e_page || (ins_r != 0))
         panic("Env region allocation failed!\n");
 }
 
@@ -351,6 +361,8 @@ load_icode(struct Env *e, uint8_t *binary)
     // program header begin
 	struct Proghdr* ph = (struct Proghdr *) (binary + elf->e_phoff);
 
+    lcr3((uintptr_t)e->env_pgdir);
+
     // last program header address
 	struct Proghdr* eph = ph + elf->e_phnum;
 
@@ -363,18 +375,22 @@ load_icode(struct Env *e, uint8_t *binary)
             // map memory
             memcpy((void *)ph->p_va, (void *)(binary + ph->p_offset), ph->p_filesz);
 
-            // remaining memory cleared
+            //remaining memory cleared
             memset((void *)(ph->p_va + ph->p_filesz), 0, ph->p_memsz - ph->p_filesz);
         }
 
         ph++;
     }
 
+    // inst pointer set to entry point
+    e->env_tf.tf_eip = elf->e_entry;
+
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
-
     region_alloc(e, (void *)(USTACKTOP - PGSIZE), PGSIZE);
-    memcpy((void *)(USTACKTOP - PGSIZE), (void *)elf->e_entry, PGSIZE);
+
+    lcr3((uintptr_t)curenv->env_pgdir);
+
 }
 
 //
@@ -389,14 +405,15 @@ env_create(uint8_t *binary, enum EnvType type)
 {
     // LAB 3: Your code here.
     struct Env* e;
+
     int err = env_alloc(&e, 0);
-    if (err) {
-        panic("env_create: %e\n", err);
-    }
+
+    if (err) panic("env_create: %e\n", err);
+
     load_icode(e, binary);
+
     e->env_type = type;
     e->env_parent_id = 0;
-
 }
 
 //
@@ -512,27 +529,15 @@ env_run(struct Env *e)
 	//	and make sure you have set the relevant parts of
 	//	e->env_tf to sensible values.
 
-<<<<<<< HEAD
-=======
-	// LAB 3: Your code here.
-
-	//Step 1:
->>>>>>> f21c7b47542306164d77cc02fbd3107d326e1a0e
-	if(curenv && curenv->env_status == ENV_RUNNING) {
+	if(curenv && curenv->env_status == ENV_RUNNING)
         curenv->env_status = ENV_RUNNABLE;
-	}
 
 	curenv = e;
     curenv->env_status = ENV_RUNNING;
     curenv->env_runs += 1;
 
-    lcr3((uint32_t)curenv->env_pgdir);
+    lcr3((uintptr_t)curenv->env_pgdir);
 
     //Step 2:
-<<<<<<< HEAD
     env_pop_tf(&curenv->env_tf);
-=======
-    env_pop_tf(&(curenv->env_tf));
-
->>>>>>> f21c7b47542306164d77cc02fbd3107d326e1a0e
 }
