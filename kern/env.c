@@ -512,6 +512,12 @@ env_run(struct Env *e)
 	//	and make sure you have set the relevant parts of
 	//	e->env_tf to sensible values.
 
+<<<<<<< HEAD
+=======
+	// LAB 3: Your code here.
+
+	//Step 1:
+>>>>>>> f21c7b47542306164d77cc02fbd3107d326e1a0e
 	if(curenv && curenv->env_status == ENV_RUNNING) {
         curenv->env_status = ENV_RUNNABLE;
 	}
@@ -523,5 +529,10 @@ env_run(struct Env *e)
     lcr3((uint32_t)curenv->env_pgdir);
 
     //Step 2:
+<<<<<<< HEAD
     env_pop_tf(&curenv->env_tf);
+=======
+    env_pop_tf(&(curenv->env_tf));
+
+>>>>>>> f21c7b47542306164d77cc02fbd3107d326e1a0e
 }
