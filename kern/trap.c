@@ -65,6 +65,11 @@ trap_init(void)
 
 	// LAB 3: Your code here.
 
+    SETGATE(idt[T_DIVIDE], 1,
+            gdt[T_DIVIDE].sd_base_15_0,
+            gdt[T_DIVIDE].sd_lim_15_0,
+            gdt[T_DIVIDE].sd_dpl);
+
 	// Per-CPU setup
 	trap_init_percpu();
 }

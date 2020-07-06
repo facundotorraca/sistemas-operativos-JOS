@@ -390,7 +390,7 @@ env_create(uint8_t *binary, enum EnvType type)
     // LAB 3: Your code here.
     struct Env* e;
     int err = env_alloc(&e, 0);
-    if (err){
+    if (err) {
         panic("env_create: %e\n", err);
     }
     load_icode(e, binary);
@@ -512,10 +512,6 @@ env_run(struct Env *e)
 	//	and make sure you have set the relevant parts of
 	//	e->env_tf to sensible values.
 
-	// LAB 3: Your code here.
-
-	//panic("env_run not yet implemented");
-	//Step 1:
 	if(curenv && curenv->env_status == ENV_RUNNING) {
         curenv->env_status = ENV_RUNNABLE;
 	}
@@ -527,6 +523,5 @@ env_run(struct Env *e)
     lcr3((uint32_t)curenv->env_pgdir);
 
     //Step 2:
-    env_pop_tf(curenv->env_tf);
-
+    env_pop_tf(&curenv->env_tf);
 }
