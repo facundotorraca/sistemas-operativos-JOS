@@ -514,7 +514,6 @@ env_run(struct Env *e)
 
 	// LAB 3: Your code here.
 
-	//panic("env_run not yet implemented");
 	//Step 1:
 	if(curenv && curenv->env_status == ENV_RUNNING) {
         curenv->env_status = ENV_RUNNABLE;
@@ -527,6 +526,6 @@ env_run(struct Env *e)
     lcr3((uint32_t)curenv->env_pgdir);
 
     //Step 2:
-    env_pop_tf(curenv->env_tf);
+    env_pop_tf(&(curenv->env_tf));
 
 }

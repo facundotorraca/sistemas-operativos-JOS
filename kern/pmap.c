@@ -101,7 +101,6 @@ boot_alloc(uint32_t n)
 	if (!nextfree) {
 		extern char end[];
 		nextfree = ROUNDUP((char *) end, PGSIZE);
-        cprintf("%08x\n", end);
 	}
 
     if (n == 0) return nextfree;
