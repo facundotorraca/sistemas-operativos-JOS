@@ -361,7 +361,7 @@ load_icode(struct Env *e, uint8_t *binary)
     // program header begin
 	struct Proghdr* ph = (struct Proghdr *) (binary + elf->e_phoff);
 
-    lcr3((uintptr_t)e->env_pgdir);
+    lcr3(PADDR(e->env_pgdir));
 
     // last program header address
 	struct Proghdr* eph = ph + elf->e_phnum;
@@ -389,8 +389,8 @@ load_icode(struct Env *e, uint8_t *binary)
 	// at virtual address USTACKTOP - PGSIZE.
     region_alloc(e, (void *)(USTACKTOP - PGSIZE), PGSIZE);
 
-    lcr3((uintptr_t)curenv->env_pgdir);
-
+    // retrieve kern page directory
+    lcr3(PADDR(kern_pgdir));
 }
 
 //
@@ -536,7 +536,7 @@ env_run(struct Env *e)
     curenv->env_status = ENV_RUNNING;
     curenv->env_runs += 1;
 
-    lcr3((uintptr_t)curenv->env_pgdir);
+    lcr3(PADDR(curenv->env_pgdir));
 
     //Step 2:
     env_pop_tf(&curenv->env_tf);
