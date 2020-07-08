@@ -283,9 +283,9 @@ region_alloc(struct Env *e, void *va, size_t len)
     int ins_r = 0;
 
     // Page allocated for env e
-    struct PageInfo* e_page = page_alloc(0);
+    struct PageInfo* e_page = 0;
 
-    while (e_page && cur_va < lst_va && ins_r == 0) {
+    while (cur_va < lst_va && ins_r == 0 && (e_page = page_alloc(0))) {
 
         ins_r = page_insert(e->env_pgdir,
                             e_page,
@@ -358,10 +358,10 @@ load_icode(struct Env *e, uint8_t *binary)
     if (elf->e_magic != ELF_MAGIC)
         panic("elf magic do not match\n");
 
+    lcr3(PADDR(e->env_pgdir));
+
     // program header begin
 	struct Proghdr* ph = (struct Proghdr *) (binary + elf->e_phoff);
-
-    lcr3(PADDR(e->env_pgdir));
 
     // last program header address
 	struct Proghdr* eph = ph + elf->e_phnum;
