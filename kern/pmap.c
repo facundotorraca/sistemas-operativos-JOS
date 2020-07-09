@@ -653,10 +653,11 @@ static uintptr_t user_mem_check_addr;
 
 
 //
-// Returns 1 if va is valid within the page directory, 0 otherwise
+// Returns 1 if va is valid (has the right permissions) within the page directory, 0 otherwise
 //
 static int
-va_in_pgdir(pde_t *pg_dir, uintptr_t va){
+va_in_pgdir(pde_t *pg_dir, uintptr_t va, int perm)
+{
 
     uint32_t pg_dir_idx = PDX(va);
     uint32_t pg_tab_idx = PTX(va);
@@ -670,7 +671,7 @@ va_in_pgdir(pde_t *pg_dir, uintptr_t va){
 
     uintptr_t *pg_tab = KADDR(pg_tab_phy);
 
-    if ((pg_tab[pg_tab_idx]) & (PTE_P))
+    if ((pg_tab[pg_tab_idx]) & (perm))
         return 1;
 
     return 0;
@@ -699,14 +700,17 @@ int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 3: Your code here.
-    uintptr_t cur_va = ROUNDDOWN((uintptr_t)va, PGSIZE);
-    uintptr_t lst_va = ROUNDUP((uintptr_t)va + len, PGSIZE);
+    uintptr_t va_aux = (uintptr_t)va;
+    uintptr_t lst_va = (uintptr_t)((uint8_t*)va + len);
 
-    while(cur_va < lst_va){
-        if (!va_in_pgdir(env->env_pgdir, cur_va)) {
+    while(va_aux < lst_va){
+        if (va_aux < ULIM && va_in_pgdir(env->env_pgdir, va_aux, perm)) {
+            va_aux += 4;
+        } else {
+            user_mem_check_addr = (uintptr_t)va_aux;
             return -E_FAULT;
         }
-        cur_va += PGSIZE;
+
     }
 
 	return 0;
