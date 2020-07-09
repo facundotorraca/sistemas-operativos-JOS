@@ -75,7 +75,7 @@ TRAPHANDLER_NOEC(trap_48, T_SYSCALL)
     pushl %es
     pushal;
 
-    mov GD_KD, %ax
+    mov $GD_KD, %ax
     mov %ax, %ds
     mov %ax, %es
 
