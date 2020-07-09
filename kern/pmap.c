@@ -651,6 +651,32 @@ tlb_invalidate(pde_t *pgdir, void *va)
 
 static uintptr_t user_mem_check_addr;
 
+
+//
+// Returns 1 if va is valid within the page directory, 0 otherwise
+//
+static int
+va_in_pgdir(pde_t *pg_dir, uintptr_t va){
+
+    uint32_t pg_dir_idx = PDX(va);
+    uint32_t pg_tab_idx = PTX(va);
+
+    // Page Table physical address
+    pte_t pg_tab_phy = pg_dir[pg_dir_idx];
+
+    if (!entry_present(pg_tab_phy)) {
+        return 0;
+    }
+
+    uintptr_t *pg_tab = KADDR(pg_tab_phy);
+
+    if ((pg_tab[pg_tab_idx]) & (PTE_P))
+        return 1;
+
+    return 0;
+
+}
+
 //
 // Check that an environment is allowed to access the range of memory
 // [va, va+len) with permissions 'perm | PTE_P'.
@@ -673,6 +699,15 @@ int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 3: Your code here.
+    uintptr_t cur_va = ROUNDDOWN((uintptr_t)va, PGSIZE);
+    uintptr_t lst_va = ROUNDUP((uintptr_t)va + len, PGSIZE);
+
+    while(cur_va < lst_va){
+        if (!va_in_pgdir(env->env_pgdir, cur_va)) {
+            return -E_FAULT;
+        }
+        cur_va += PGSIZE;
+    }
 
 	return 0;
 }
