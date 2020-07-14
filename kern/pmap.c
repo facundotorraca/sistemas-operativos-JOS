@@ -442,9 +442,9 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
     uint32_t pti = PTX(va);
 
     // Page Table physical address
-    pte_t pgtab = pgdir[pdi];
+    pte_t pgtab_pa = pgdir[pdi];
 
-    if (!entry_present(pgtab)) {
+    if (!entry_present(pgtab_pa)) {
         // dont create a new page
         if (!create) return NULL;
 
@@ -463,10 +463,10 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
     }
 
     // Page Table virtual address
-    pte_t* pgtabv = (pte_t *)KADDR(PTE_ADDR(pgdir[pdi]));
+    pte_t* pgtab = (pte_t *)KADDR(PTE_ADDR(pgdir[pdi]));
 
     // returns a ptr to page table entry
-	return &pgtabv[pti];
+	return &pgtab[pti];
 }
 
 //
@@ -656,26 +656,21 @@ static uintptr_t user_mem_check_addr;
 // Returns 1 if va is valid (has the right permissions) within the page directory, 0 otherwise
 //
 static int
-va_in_pgdir(pde_t *pg_dir, uintptr_t va, int perm)
+va_in_pgdir(pde_t *pgdir, uintptr_t va, int perm)
 {
-
-    uint32_t pg_dir_idx = PDX(va);
-    uint32_t pg_tab_idx = PTX(va);
+    uint32_t pdi = PDX(va);
+    uint32_t pti = PTX(va);
 
     // Page Table physical address
-    pte_t pg_tab_phy = pg_dir[pg_dir_idx];
+    pte_t pgtab_pa = pgdir[pdi];
 
-    if (!entry_present(pg_tab_phy)) {
+    if (!entry_present(pgtab_pa)) {
         return 0;
     }
 
-    pte_t *pg_tab = (pte_t *)KADDR(PTE_ADDR(pg_tab_phy));
+    pte_t *pgtab = (pte_t *)KADDR(PTE_ADDR(pgtab_pa));
 
-    if (pg_tab[pg_tab_idx] & (perm))
-        return 1;
-
-    return 0;
-
+    return (pgtab[pti] & perm) == perm;
 }
 
 //
@@ -699,15 +694,18 @@ va_in_pgdir(pde_t *pg_dir, uintptr_t va, int perm)
 int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
-	// LAB 3: Your code here.
-    uintptr_t va_aux = (uintptr_t)va;
-    uintptr_t lst_va = (uintptr_t)((uint8_t*)va + len);
 
-    while(va_aux < lst_va){
-        cprintf("va: %u\n", (uintptr_t)va_aux);
-        if (va_aux < ULIM && va_in_pgdir(env->env_pgdir, va_aux, perm)) {
+    uintptr_t va_aux = (uintptr_t)va;
+    uintptr_t lst_va = (uintptr_t)va + len;
+
+    while (va_aux < lst_va) {
+
+        if (va_aux < ULIM && va_in_pgdir(env->env_pgdir, va_aux, perm | PTE_P))
+            // va_aux % PGSIZE might be different
+            // from 0 only in the first iteration
+            // if va is not page alligned
             va_aux += PGSIZE - (va_aux % PGSIZE);
-        } else {
+        else {
             user_mem_check_addr = (uintptr_t)va_aux;
             return -E_FAULT;
         }
