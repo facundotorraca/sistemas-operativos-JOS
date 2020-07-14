@@ -669,9 +669,9 @@ va_in_pgdir(pde_t *pg_dir, uintptr_t va, int perm)
         return 0;
     }
 
-    uintptr_t *pg_tab = KADDR(pg_tab_phy);
+    pte_t *pg_tab = (pte_t *)KADDR(PTE_ADDR(pg_tab_phy));
 
-    if ((pg_tab[pg_tab_idx]) & (perm))
+    if (pg_tab[pg_tab_idx] & (perm))
         return 1;
 
     return 0;
@@ -704,8 +704,9 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
     uintptr_t lst_va = (uintptr_t)((uint8_t*)va + len);
 
     while(va_aux < lst_va){
+        cprintf("va: %u\n", (uintptr_t)va_aux);
         if (va_aux < ULIM && va_in_pgdir(env->env_pgdir, va_aux, perm)) {
-            va_aux += 4;
+            va_aux += PGSIZE - (va_aux % PGSIZE);
         } else {
             user_mem_check_addr = (uintptr_t)va_aux;
             return -E_FAULT;
