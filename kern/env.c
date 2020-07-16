@@ -222,6 +222,9 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	if (generation <= 0)  // Don't create a negative env_id.
 		generation = 1 << ENVGENSHIFT;
 	e->env_id = generation | (e - envs);
+    
+    // (1 << ENVGENSHIFT) -> 1000
+    // ~(NENV - 1)        -> fffffc00
 
 	// Set the basic status variables.
 	e->env_parent_id = parent_id;
