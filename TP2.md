@@ -69,9 +69,109 @@ La CPU guarda el nivel actual de privilegio (CPL) en los dos bits menos signific
 # gdb_hello
 ---------
 
+## Primeras 5 lineas de info registers:
+
+eax            0x5c000             376832
+ecx            0xf005c000          -268058624
+edx            0x21e               542
+ebx            0x10094             65684
+esp            0xf011afbc          0xf011afbc
+
+## Impresion del valor del registro tf:
+
+$1 = (struct Trapframe *) 0xf01c9000
+
+## Imprimir, con x/Nx tf tantos enteros como haya en el struct Trapframe donde N = sizeof(Trapframe) / sizeof(int).
+
+(gdb) print sizeof(struct Trapframe)/ sizeof(int)
+$2 = 17
+
+(gdb) x/17x tf
+0xf01c9000:	0x00000000	0x00000000	0x00000000	0x00000000
+0xf01c9010:	0x00000000	0x00000000	0x00000000	0x00000000
+0xf01c9020:	0x00000023	0x00000023	0x00000000	0x00000000
+0xf01c9030:	0x00800020	0x0000001b	0x00000000	0xeebfe000
+0xf01c9040:	0x00000023
+
+## Comprobar, con x/Nx $sp que los contenidos son los mismos que tf (donde N es el tamaño de tf).
+
+(gdb) disas
+Dump of assembler code for function env_pop_tf:
+=> 0xf0103091 <+0>:	endbr32
+   0xf0103095 <+4>:	push   %ebp
+   0xf0103096 <+5>:	mov    %esp,%ebp
+   0xf0103098 <+7>:	sub    $0xc,%esp
+   0xf010309b <+10>:	mov    0x8(%ebp),%esp
+   0xf010309e <+13>:	popa   
+   0xf010309f <+14>:	pop    %es
+   0xf01030a0 <+15>:	pop    %ds
+   0xf01030a1 <+16>:	add    $0x8,%esp
+   0xf01030a4 <+19>:	iret   
+   0xf01030a5 <+20>:	push   $0xf0105b38
+   0xf01030aa <+25>:	push   $0x1fa
+   0xf01030af <+30>:	push   $0xf0105ada
+   0xf01030b4 <+35>:	call   0xf01000ad <_panic>
+End of assembler dump.
+
+(gdb) si 5
+=> 0xf010309e <env_pop_tf+13>:	popa   
+0xf010309e in env_pop_tf (tf=0x0) at kern/env.c:497
+497		asm volatile("\tmovl %0,%%esp\n"
+
+(gdb) x/17x $sp
+0xf01c9000:	0x00000000	0x00000000	0x00000000	0x00000000
+0xf01c9010:	0x00000000	0x00000000	0x00000000	0x00000000
+0xf01c9020:	0x00000023	0x00000023	0x00000000	0x00000000
+0xf01c9030:	0x00800020	0x0000001b	0x00000000	0xeebfe000
+0xf01c9040:	0x00000023
+
+efectivamente todos los valores son los mismos.
+
+## Describir cada uno de los valores. Para los valores no nulos, se debe indicar dónde se configuró inicialmente el valor, y qué representa.
 
 
-########### HACERLA!
+
+HACERLA
+
+
+
+## Continuar hasta la instrucción iret, sin llegar a ejecutarla. Mostrar en este punto, de nuevo, las cinco primeras líneas de info registers en el monitor de QEMU. Explicar los cambios producidos.
+
+(gdb) info registers
+eax            0x0                 0
+ecx            0x0                 0
+edx            0x0                 0
+ebx            0x0                 0
+esp            0xf01c9030          0xf01c9030
+
+
+## Ejecutar la instrucción iret. En ese momento se ha realizado el cambio de contexto y los símbolos del kernel ya no son válidos.
+
+* imprimir el valor del contador de programa con p $pc o p $eip
+
+(gdb) p $pc
+$1 = (void (*)()) 0x800020
+
+* luego de cargar los símbolos de hello, volver a imprimir el contador de programa
+
+(gdb) p $pc
+$2 = (void (*)()) 0x800020 <_start>
+
+* Mostrar una última vez la salida de info registers en QEMU, y explicar los cambios producidos.
+
+(gdb) info registers
+eax            0x0                 0
+ecx            0x0                 0
+edx            0x0                 0
+ebx            0x0                 0
+esp            0xeebfe000          0xeebfe000
+
+## Poner un breakpoint temporal (tbreak, se aplica una sola vez) en la función syscall() y explicar qué ocurre justo tras ejecutar la instrucción int $0x30. Usar, de ser necesario, el monitor de QEMU.
+
+se llama al handler:
+TRAPHANDLER_NOEC(trap_48, T_SYSCALL)
+
+
 
 
 
@@ -97,7 +197,7 @@ Al ejecutar el programa se ve que genera una excepcion "General protection", es 
 
 ## ¿En qué se diferencia el código de la versión en evilhello.c del código de la página https://fisop.github.io/7508/jos/tp2/#tarea-user_evilhello ? ¿En qué cambia el comportamiento durante la ejecución? ¿Por qué? ¿Cuál es el mecanismo?
 
-La diferencia es que en el código de evilhello.c no se lanza una excepción debido a que la syscall puts no verifica que la dirección virtual sea válida y además la syscall, al 
+La diferencia es que en el código de evilhello.c no se lanza una excepción debido a que la syscall puts no verifica que la dirección virtual sea válida y además la syscall, al
 ejecutarse en modo kernel, puede acceder a direcciones de memoria del kernel (Para que esto no suceda, luego se implementa una verificación en la tarea "user_mem_check"). En cambio en el código de la página ocurre una excepcion de tipo "Page Fault". Esto sucede ya que se trata de acceder a una dirección del kernel (en la desrreferencia "*entry;", donde entry es un puntero a una dirección virtual del kernel) directamente desde el espacio de usuario, que no la tiene mapeada en su page directory.
 
 
