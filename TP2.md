@@ -39,12 +39,9 @@ y los 21 bits mas significatios inidican la cantidad de ejecuciones sobre un det
 # env_init_percpu
 ---------------
 
+## ¿Cuántos bytes escribe la función lgdt, y dónde? ¿Qué representan esos bytes?
 
-
-########### HACERLA!
-
-
-
+La funcion lgdt llamada en env_init_percpu escribe en total 48 bytes en el registro GDTR (Global Descriptor Table Register), es decir los que corresponden a los atributos de un struct Pseudodesc que serian el límite (tamaño) de una estructura Segdesc correspondiente a una GDT (global descriptor table, que contiene a su vez la base y el limite los segmentos del kernel) y la direccion de dicha estructura.
 
 
 # env_pop_tf
@@ -66,13 +63,7 @@ y los 21 bits mas significatios inidican la cantidad de ejecuciones sobre un det
 
 ## ¿Cómo determina la CPU (en x86) si hay un cambio de ring (nivel de privilegio)? Ayuda: Responder antes en qué lugar exacto guarda x86 el nivel de privilegio actual. ¿Cuántos bits almacenan ese privilegio?
 
-La CPU guarda el nivel actual de privilegio (CPL) en los ultimos dos bits del registro CS, por lo que para determinar un cambio de ring se analizan...
-
-
-
-######### TODO: SEGUIRLA!
-
-
+La CPU guarda el nivel actual de privilegio (CPL) en los dos bits menos significativos del registro CS, por lo que para determinar un cambio de ring se compara con el DPL (descriptor privilege level) del segmento accedido. Esta información es posible obtenerla mediante la gdt (Estructura Segdesc, global descriptor table).
 
 
 # gdb_hello
