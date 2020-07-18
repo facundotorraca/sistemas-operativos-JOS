@@ -125,10 +125,37 @@ End of assembler dump.
 0xf01c9030:	0x00800020	0x0000001b	0x00000000	0xeebfe000
 0xf01c9040:	0x00000023
 
-efectivamente todos los valores son los mismos.
+Como puede apreciarse todos los valores son los mismos que los de tf.
 
 ## Describir cada uno de los valores. Para los valores no nulos, se debe indicar dónde se configuró inicialmente el valor, y qué representa.
 
+Los valores indican cada uno de los elementos del struct trapframe, es decir: 
+
+uint32_t reg_edi  = 0x00000000;
+uint32_t reg_esi  = 0x00000000;
+uint32_t reg_ebp  = 0x00000000;
+uint32_t reg_oesp = 0x00000000;		/* Useless */
+uint32_t reg_ebx  = 0x00000000;
+uint32_t reg_edx  = 0x00000000;
+uint32_t reg_ecx  = 0x00000000;
+uint32_t reg_eax  = 0x00000000;
+
+uint16_t tf_es    = 0x00000023;     Direccion del extra segment
+uint16_t tf_padding1 (16 bits mas altos del anterior);
+
+uint16_t tf_ds    = 0x00000023;     Direccion del data segment
+uint16_t tf_padding2 (16 bits mas altos del anterior);
+uint32_t tf_trapno = 0x00000000;
+/* below here defined by x86 hardware */
+uint32_t tf_err    = 0x00000000;
+uintptr_t tf_eip   = 0x00800020;    Instruction pointer
+uint16_t tf_cs     = 0x0000001b;    Code segment
+uint16_t tf_padding3 (16 bits mas altos del anterior);
+uint32_t tf_eflags = 0x00000000;
+/* below here only when crossing rings, such as from user to kernel */
+uintptr_t tf_esp   = 0xeebfe000;    Stack pointer del proceso del user que estaba antes de llamar a la interrupcion
+uint16_t tf_ss     = 0x00000023;    Stack segment del proc del user.
+uint16_t tf_padding4 (16 bits mas altos del anterior);
 
 
 HACERLA
@@ -165,6 +192,12 @@ ecx            0x0                 0
 edx            0x0                 0
 ebx            0x0                 0
 esp            0xeebfe000          0xeebfe000
+
+
+
+EXPLICAR CAMBIOS PRODUCIDOS
+
+
 
 ## Poner un breakpoint temporal (tbreak, se aplica una sola vez) en la función syscall() y explicar qué ocurre justo tras ejecutar la instrucción int $0x30. Usar, de ser necesario, el monitor de QEMU.
 
