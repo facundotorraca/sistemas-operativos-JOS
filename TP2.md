@@ -216,7 +216,7 @@ esp            0xf01c0030	0xf01c0030<br/>
 
 Los cambios en los registros eax, ecx, edx y ebx a 0x0 se deben a que en la instruccion popa se tomaron los valores
 de dichos registros guardados en el struct Trapframe, los cuales como fueron vistos en el punto anterior estaban
-seteados en 0.
+seteados en 0.<br/>
 En cambio el valor del %esp es 0xf01c0030 ya que fue modificado justo en la instruccion anterior
 a popa (es decir mov 0x8(%ebp),%esp) y el valor representa la direccion donde está guardado el struct Trapframe de forma
 que al ir popeando del stack principal se popeen los atributos de dicho Trapframe.
@@ -229,12 +229,12 @@ que al ir popeando del stack principal se popeen los atributos de dicho Trapfram
 => 0x800020:	cmp    $0xeebfe000,%esp<br/>
 0x00800020 in ?? ()<br/>
 
-* imprimir el valor del contador de programa con p $pc o p $eip
+* Imprimir el valor del contador de programa con p $pc o p $eip
 
 (gdb) p $pc<br/>
 $2 = (void (*)()) 0x800020<br/>
 
-* luego de cargar los símbolos de hello
+* Luego de cargar los símbolos de hello
 
 (gdb) add-symbol-file obj/user/hello 0x800020<br/>
 add symbol table from file "obj/user/hello" at<br/>
@@ -243,7 +243,7 @@ add symbol table from file "obj/user/hello" at<br/>
 Leyendo símbolos desde obj/user/hello...hecho.
 
 
-* volver a imprimir el contador de programa
+* Volver a imprimir el contador de programa
 
 (gdb) p $pc<br/>
 $3 = (void (*)()) 0x800020 <_start><br/>
@@ -268,8 +268,8 @@ es             0x23	35<br/>
 fs             0x23	35<br/>
 gs             0x23	35<br/>
 
-Los cambios en los registros se deben a que fueron modificados en la funcion env_pop_tf y corresponden a los valores
-de los atributos del trapframe que recibió esa funcion.  
+Los cambios en los registros se deben a que fueron modificados en la función env_pop_tf y corresponden a los 
+valores de los atributos del trapframe que recibió esa función.  
 
 
 ### 10 - Poner un breakpoint temporal (tbreak, se aplica una sola vez) en la función syscall() y explicar qué ocurre justo tras ejecutar la instrucción int $0x30. Usar, de ser necesario, el monitor de QEMU.
@@ -305,7 +305,7 @@ Dump of assembler code for function syscall:<br/>
    0x008009e5 <+12>:	mov    %edx,-0x1c(%ebp)<br/>
    0x008009e8 <+15>:	mov    %ecx,%edx<br/>
 => 0x008009ea <+17>:	mov    0x8(%ebp),%ecx<br/>
-   0x008009f0 <+23>:	mov    0x10(%ebp),%edi
+   0x008009f0 <+23>:	mov    0x10(%ebp),%edi<br/>
    0x008009ed <+20>:	mov    0xc(%ebp),%ebx<br/>
    0x008009f3 <+26>:	mov    0x14(%ebp),%esi<br/>
    0x008009f6 <+29>:	int    $0x30<br/>
@@ -329,7 +329,7 @@ Se asume que la arquitectura objetivo es i8086<br/>
 El contador de programa no contiene funciones para el marco seleccionado.<br/>
 
 
-Lo que sucede es que como todavía no esta implementado el handler de la interrupcion syscall
+Lo que sucede es que como todavía no esta implementado el handler de la interrupción syscall
 (TRAPHANDLER_NOEC(trap_48, T_SYSCALL)) el sistema loopea en el booteo si se continua la ejecución con gdb y se
 detiene cada vez en el breakpoint seteado previamente en env_pop_tf.
 
