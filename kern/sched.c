@@ -35,7 +35,7 @@ sched_yield(void)
     if (curenv)
         curenv_pos = ENVX(curenv->env_id) + 1;
 
-    while (envs_visited <= NENV - 1) {
+    while (envs_visited < NENV - 1) {
 
         if (curenv_pos >= NENV)
             curenv_pos = 0;
