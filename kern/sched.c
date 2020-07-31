@@ -40,8 +40,10 @@ sched_yield(void)
         if (curenv_pos >= NENV)
             curenv_pos = 0;
 
-        if (envs[curenv_pos].env_status == ENV_RUNNABLE)
+        if (envs[curenv_pos].env_status == ENV_RUNNABLE) {
+            curenv->env_status == ENV_RUNNABLE;
             env_run(&envs[curenv_pos]);
+        }
 
         envs_visited++;
         curenv_pos++;
