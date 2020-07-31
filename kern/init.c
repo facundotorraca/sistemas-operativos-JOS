@@ -68,14 +68,10 @@ i386_init(void)
 		ENV_CREATE(TEST, ENV_TYPE_USER);
 #else
 	// Touch all you want.
-	ENV_CREATE(user_hello, ENV_TYPE_USER);
-	ENV_CREATE(user_hello, ENV_TYPE_USER);
-	ENV_CREATE(user_hello, ENV_TYPE_USER);
+	ENV_CREATE(user_yield, ENV_TYPE_USER);
+	ENV_CREATE(user_yield, ENV_TYPE_USER);
+	ENV_CREATE(user_yield, ENV_TYPE_USER);
 #endif // TEST*
-
-	// Eliminar esta llamada una vez completada la parte 1
-	// e implementado sched_yield().
-	env_run(&envs[0]);
 
 	// Schedule and run the first user environment!
 	sched_yield();
@@ -103,7 +99,7 @@ boot_aps(void)
 		if (c == cpus + cpunum())  // We've started already.
 			continue;
 
-		// Tell mpentry.S what stack to use 
+		// Tell mpentry.S what stack to use
 		mpentry_kstack = percpu_kstacks[c - cpus] + KSTKSIZE;
 		// Start the CPU at mpentry_start
 		lapic_startap(c->cpu_id, PADDR(code));
@@ -117,7 +113,7 @@ boot_aps(void)
 void
 mp_main(void)
 {
-	// We are in high EIP now, safe to switch to kern_pgdir 
+	// We are in high EIP now, safe to switch to kern_pgdir
 	lcr3(PADDR(kern_pgdir));
 	cprintf("SMP: CPU %d starting\n", cpunum());
 

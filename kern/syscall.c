@@ -275,6 +275,8 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
             return 0;
         case SYS_cgetc:
             return sys_cgetc();
+        case SYS_yield:
+            sys_yield();
         case SYS_getenvid:
             return sys_getenvid();
         case SYS_env_destroy:

@@ -189,9 +189,6 @@ mem_init(void)
     check_page_alloc();
     check_page();
 
-    cprintf("llegue_1\n");
-
-
 	//////////////////////////////////////////////////////////////////////
 	// Now we set up virtual memory
 
