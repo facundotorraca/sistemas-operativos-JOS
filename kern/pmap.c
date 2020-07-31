@@ -177,7 +177,6 @@ mem_init(void)
     envs = boot_alloc(sizeof(struct Env) * NENV);
     memset(envs, 0, sizeof(struct PageInfo) * NENV);
 
-
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
 	// up the list of free physical pages. Once we've done so, all further
@@ -187,8 +186,11 @@ mem_init(void)
 	page_init();
 
 	check_page_free_list(1);
-	check_page_alloc();
-	check_page();
+    check_page_alloc();
+    check_page();
+
+    cprintf("llegue_1\n");
+
 
 	//////////////////////////////////////////////////////////////////////
 	// Now we set up virtual memory
@@ -724,12 +726,14 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// Hint: The staff solution uses boot_map_region.
 	//
 	// Your code here:
-	if (base + size > MMIOLIM)
+    size_t roundes_size = ROUNDUP(size, PGSIZE);
+
+	if (base + roundes_size > MMIOLIM)
 	    panic("mmio_map_region not implemented");
 
-	boot_map_region(kern_pgdir, base, size, pa, PTE_PCD|PTE_PWT|PTE_W);
+	boot_map_region(kern_pgdir, base, roundes_size, pa, PTE_PCD|PTE_PWT|PTE_W);
 	uintptr_t base_aux = base;
-	base += size;
+	base += roundes_size;
 	return (void *)base_aux;
 }
 
@@ -1219,6 +1223,7 @@ check_page(void)
 	// check that they're in the right region
 	assert(mm1 >= MMIOBASE && mm1 + 8096 < MMIOLIM);
 	assert(mm2 >= MMIOBASE && mm2 + 8096 < MMIOLIM);
+
 	// check that they're page-aligned
 	assert(mm1 % PGSIZE == 0 && mm2 % PGSIZE == 0);
 	// check that they don't overlap
