@@ -284,6 +284,12 @@ mem_init_mp(void)
 	//     Permissions: kernel RW, user NONE
 	//
 	// LAB 4: Your code here:
+
+	for (int i=0; i<NCPU; ++i){
+        boot_map_region(kern_pgdir, KSTACKTOP - KSTKSIZE - i*(KSTKSIZE + KSTKGAP), KSTKSIZE,
+                        (uintptr_t)PADDR(percpu_kstacks[i]), PTE_W);
+	}
+
 }
 
 // --------------------------------------------------------------
@@ -314,6 +320,10 @@ is_initial_free_page(size_t pnumber)
 
     // Memory allocated for the kernel
     if (vpa >= (EXTPHYSMEM + KERNBASE) && vpa < (uint32_t)end)
+        return 0;
+
+    // Page reserved by JOS for MultiProcessor initialization
+    if (vpa == MPENTRY_PADDR + KERNBASE)
         return 0;
 
     // First page allocated
@@ -714,7 +724,13 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// Hint: The staff solution uses boot_map_region.
 	//
 	// Your code here:
-	panic("mmio_map_region not implemented");
+	if (base + size > MMIOLIM)
+	    panic("mmio_map_region not implemented");
+
+	boot_map_region(kern_pgdir, base, size, pa, PTE_PCD|PTE_PWT|PTE_W);
+	uintptr_t base_aux = base;
+	base += size;
+	return (void *)base_aux;
 }
 
 static uintptr_t user_mem_check_addr;
