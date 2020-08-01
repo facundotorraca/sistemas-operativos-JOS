@@ -87,8 +87,8 @@ sys_exofork(void)
 	// LAB 4: Your code here.
 	struct Env *new_env;
     int r_val = env_alloc(&new_env, curenv->env_id);
-    if (r_val < 0)
-        return r_val;
+
+    if (r_val < 0) return r_val;
 
     new_env->env_status = ENV_NOT_RUNNABLE;
     new_env->env_tf = curenv->env_tf;
@@ -113,7 +113,7 @@ sys_env_set_status(envid_t envid, int status)
 	// envid's status.
 
 	// LAB 4: Your code here.
-	if (status != ENV_RUNNABLE || status != ENV_NOT_RUNNABLE)
+	if (status != ENV_RUNNABLE && status != ENV_NOT_RUNNABLE)
 	    return -E_INVAL;
 
 	struct Env *e;
@@ -122,7 +122,6 @@ sys_env_set_status(envid_t envid, int status)
 	    return r;
 	e->env_status = status;
 	return 0;
-
 }
 
 // Set the page fault upcall for 'envid' by modifying the corresponding struct
@@ -171,10 +170,11 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 	    return -E_INVAL;
 
 	struct Env *e;
-	int r;
+	int r = envid2env(envid, &e, 1);
 
-	if ((r = envid2env(envid, &e, 1)) < 0)
-	    return r;
+	if (r < 0) return r;
+
+    cprintf("chau\n");
 
     struct PageInfo *p;
     if (!(p = page_alloc(ALLOC_ZERO))) //page alloc returns NULL on failure
@@ -213,7 +213,13 @@ sys_page_map(envid_t srcenvid, void *srcva, envid_t dstenvid, void *dstva, int p
 
 	// LAB 4: Your code here.
 
-    if (perm & ~PTE_SYSCALL || (uintptr_t)srcva >= UTOP || (uintptr_t)srcva % PGSIZE || (uintptr_t)dstva >= UTOP || (uintptr_t)dstva % PGSIZE)
+    if (perm & ~PTE_SYSCALL)
+        return -E_INVAL;
+
+    if ((uintptr_t)srcva >= UTOP || (uintptr_t)dstva >= UTOP)
+        return -E_INVAL;
+
+    if ((uintptr_t)srcva % PGSIZE || (uintptr_t)dstva % PGSIZE)
         return -E_INVAL;
 
     struct Env *e_src;
@@ -230,12 +236,11 @@ sys_page_map(envid_t srcenvid, void *srcva, envid_t dstenvid, void *dstva, int p
     pte_t *pte;
     struct PageInfo *p_src = page_lookup(e_src->env_pgdir, srcva, &pte);
 
-    if (!p_src || (!((uintptr_t)pte & PTE_W) && ((uintptr_t)perm & PTE_W)))
+    if (!p_src || (perm & PTE_W) == ((uintptr_t)pte & PTE_W))
         return -E_INVAL;
 
     r = page_insert(e_dst->env_pgdir, p_src, dstva, perm);
     return r;
-
 }
 
 // Unmap the page of memory at 'va' in the address space of 'envid'.
@@ -343,6 +348,16 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
             return sys_cgetc();
         case SYS_yield:
             sys_yield();
+        case SYS_exofork:
+            return sys_exofork();
+        case SYS_env_set_status:
+            return sys_env_set_status((envid_t)a1, (int)a2);
+        case SYS_page_alloc:
+            return sys_page_alloc((envid_t)a1, (void *)a2, (int)a3);
+        case SYS_page_map:
+            return sys_page_map((envid_t)a1, (void *)a2, (envid_t)a3, (void *)a4, (int)a5);
+        case SYS_page_unmap:
+            return sys_page_unmap((envid_t)a1, (void *)a2);
         case SYS_getenvid:
             return sys_getenvid();
         case SYS_env_destroy:
