@@ -77,9 +77,48 @@ duppage(envid_t envid, unsigned pn)
 envid_t
 fork(void)
 {
-	// LAB 4: Your code here.
-	panic("fork not implemented");
+	return fork_v0();
 }
+
+
+static void
+dup_or_share(envid_t dstenv, void *va, int perm)
+{
+
+}
+
+static envid_t
+fork_v0(void)
+{
+    envid_t envid = sys_exofork();
+
+    if (envid < 0)
+        panic("sys_exofork: %e", envid);
+
+    if (envid == 0) {
+        thisenv = &envs[ENVX(sys_getenvid())];
+        return 0;
+    }
+
+    pte_t* pte;
+
+    uintptr_t va;
+    for (va = 0; va < UTOP; va += PGSIZE) {
+        if (page_lookup(thisenv->env_pgdir, (void *)va, &pte))
+            dup_or_share(envid, va, PGOFF((uintptr_t)pte)/*perms*/);
+    }
+
+    struct Env *child;
+
+    int r;
+    if ((r = envid2env(envid, &child, 1)) < 0)
+        return r;
+
+    child->env_status == ENV_RUNNABLE;
+
+    return envid;
+}
+
 
 // Challenge!
 int
