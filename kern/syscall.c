@@ -93,6 +93,8 @@ sys_exofork(void)
     new_env->env_status = ENV_NOT_RUNNABLE;
     new_env->env_tf = curenv->env_tf;
 
+    new_env->env_tf.tf_regs.reg_eax = 0;
+
     return new_env->env_id;
 }
 
@@ -173,8 +175,6 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 	int r = envid2env(envid, &e, 1);
 
 	if (r < 0) return r;
-
-    cprintf("chau\n");
 
     struct PageInfo *p;
     if (!(p = page_alloc(ALLOC_ZERO))) //page alloc returns NULL on failure
@@ -353,7 +353,7 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
         case SYS_env_set_status:
             return sys_env_set_status((envid_t)a1, (int)a2);
         case SYS_page_alloc:
-            return sys_page_alloc((envid_t)a1, (void *)a2, (int)a3);
+            return sys_page_alloc((envid_t)a1, (void *)a2, a3);
         case SYS_page_map:
             return sys_page_map((envid_t)a1, (void *)a2, (envid_t)a3, (void *)a4, (int)a5);
         case SYS_page_unmap:
