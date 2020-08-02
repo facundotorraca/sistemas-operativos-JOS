@@ -62,7 +62,7 @@ static void
 dup_or_share(envid_t dstenv, void *va, int perm)
 {
     int r;
-    if ((perm & PTE_W) != 0) {
+    if ((perm & PTE_W) == 0) {
         if ((r = sys_page_map(0, va, dstenv, va, perm)) < 0)
             panic("sys_page_map: %e", r);
         return;
