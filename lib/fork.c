@@ -74,26 +74,32 @@ duppage(envid_t envid, unsigned pn)
 //   Neither user exception stack should ever be marked copy-on-write,
 //   so you must allocate a new page for the child's user exception stack.
 //
-envid_t
-fork(void)
-{
-	return fork_v0();
-}
-
-
-//
-// Map our virtual page pn (address pn*PGSIZE) into the target envid
-// at the same virtual address.  If the page is writable or copy-on-write,
-// the new mapping must be created copy-on-write, and then our mapping must be
-// marked copy-on-write as well.  (Exercise: Why do we need to mark ours
-// copy-on-write again if it was already copy-on-write at the beginning of
-// this function?)
-//
-// Returns: 0 on success, < 0 on error.
 static void
 dup_or_share(envid_t dstenv, void *va, int perm)
 {
-    
+    int r;
+    if ((perm & PTE_W) != 0) {
+        if ((r = sys_page_map(0, va, dstenv, va, perm)) < 0)
+            panic("sys_page_map: %e", r);
+        return;
+    }
+
+    if ((r = sys_page_alloc(dstenv, va, perm)) < 0)
+        panic("sys_page_alloc: %e", r);
+
+    if ((r = sys_page_map(dstenv, va, 0, UTEMP, perm)) < 0)
+        panic("sys_page_map: %e", r);
+
+    memmove(UTEMP, va, PGSIZE);
+
+    if ((r = sys_page_unmap(0, UTEMP)) < 0)
+        panic("sys_page_unmap: %e", r);
+}
+
+static bool
+page_is_present(uintptr_t va)
+{
+    return (uvpd[PDX(va)] & PTE_P) && (uvpt[PGNUM(va)] & PTE_P);
 }
 
 static envid_t
@@ -113,21 +119,22 @@ fork_v0(void)
 
     uintptr_t va;
     for (va = 0; va < UTOP; va += PGSIZE) {
-        if (page_lookup(thisenv->env_pgdir, (void *)va, &pte))
-            dup_or_share(envid, va, PGOFF((uintptr_t)pte)/*perms*/);
+        if (page_is_present(va))
+            dup_or_share(envid, (void *)va, PGOFF(uvpt[PGNUM(va)]));
     }
 
-    struct Env *child;
-
-    int r;
-    if ((r = envid2env(envid, &child, 1)) < 0)
-        return r;
-
-    child->env_status == ENV_RUNNABLE;
+    struct Env child = envs[ENVX(envid)];
+    child.env_status == ENV_RUNNABLE;
 
     return envid;
 }
 
+
+envid_t
+fork(void)
+{
+	return fork_v0();
+}
 
 // Challenge!
 int
