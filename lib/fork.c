@@ -58,22 +58,6 @@ duppage(envid_t envid, unsigned pn)
 	return 0;
 }
 
-//
-// User-level fork with copy-on-write.
-// Set up our page fault handler appropriately.
-// Create a child.
-// Copy our address space and page fault handler setup to the child.
-// Then mark the child as runnable and return.
-//
-// Returns: child's envid to the parent, 0 to the child, < 0 on error.
-// It is also OK to panic on error.
-//
-// Hint:
-//   Use uvpd, uvpt, and duppage.
-//   Remember to fix "thisenv" in the child process.
-//   Neither user exception stack should ever be marked copy-on-write,
-//   so you must allocate a new page for the child's user exception stack.
-//
 static void
 dup_or_share(envid_t dstenv, void *va, int perm)
 {
@@ -96,7 +80,7 @@ dup_or_share(envid_t dstenv, void *va, int perm)
         panic("sys_page_unmap: %e", r);
 }
 
-static bool
+static int
 page_is_present(uintptr_t va)
 {
     return (uvpd[PDX(va)] & PTE_P) && (uvpt[PGNUM(va)] & PTE_P);
@@ -115,21 +99,35 @@ fork_v0(void)
         return 0;
     }
 
-    pte_t* pte;
-
     uintptr_t va;
     for (va = 0; va < UTOP; va += PGSIZE) {
         if (page_is_present(va))
-            dup_or_share(envid, (void *)va, PGOFF(uvpt[PGNUM(va)]));
+            dup_or_share(envid, (void *)va, PGOFF(uvpt[PGNUM(va)]) & PTE_SYSCALL);
     }
 
-    struct Env child = envs[ENVX(envid)];
-    child.env_status == ENV_RUNNABLE;
+    int r = sys_env_set_status(envid, ENV_RUNNABLE);
+    if (r < 0)
+        return r;
 
     return envid;
 }
 
-
+//
+// User-level fork with copy-on-write.
+// Set up our page fault handler appropriately.
+// Create a child.
+// Copy our address space and page fault handler setup to the child.
+// Then mark the child as runnable and return.
+//
+// Returns: child's envid to the parent, 0 to the child, < 0 on error.
+// It is also OK to panic on error.
+//
+// Hint:
+//   Use uvpd, uvpt, and duppage.
+//   Remember to fix "thisenv" in the child process.
+//   Neither user exception stack should ever be marked copy-on-write,
+//   so you must allocate a new page for the child's user exception stack.
+//
 envid_t
 fork(void)
 {
