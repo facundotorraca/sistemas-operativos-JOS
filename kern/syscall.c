@@ -352,8 +352,8 @@ static int
 sys_ipc_recv(void *dstva)
 {
 	// LAB 4: Your code here.
-    curenv->env_status = ENV_NOT_RUNNABLE;
     curenv->env_ipc_recving = true;
+    curenv->env_status = ENV_NOT_RUNNABLE;
 
     if ((uintptr_t)dstva < UTOP) {
         if ((uintptr_t)dstva % PGSIZE != 0)
@@ -395,6 +395,10 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
             return sys_getenvid();
         case SYS_env_destroy:
             return sys_env_destroy((envid_t)a1);
+        case SYS_ipc_recv:
+            return sys_ipc_recv((void*)a1);
+        case SYS_ipc_try_send:
+            return sys_ipc_try_send(a1, a2, (void*)a3, a4);
         default:
 	        return -E_INVAL;
 	}
