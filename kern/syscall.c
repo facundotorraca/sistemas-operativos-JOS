@@ -312,7 +312,29 @@ static int
 sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 {
 	// LAB 4: Your code here.
-	panic("sys_ipc_try_send not implemented");
+	struct Env* dstenv;
+
+    int r;
+    if ((r = envid2env(envid, &dstenv, 0)) < 0)
+        return -E_BAD_ENV;
+
+    if (!dstenv->env_ipc_recving)
+        return -E_IPC_NOT_RECV;
+
+    // if source want to send a page and dest wants to receive a page
+    if ((uintptr_t)srcva < UTOP && (uintptr_t)dstenv->env_ipc_dstva < UTOP) {
+        if ((r = sys_page_map(0, srcva, envid, dstenv->env_ipc_dstva, perm & PTE_SYSCALL)) < 0)
+            return r;
+        dstenv->env_ipc_perm = perm; // page transferred
+    } else
+        dstenv->env_ipc_perm = 0; // page not transferred
+
+    dstenv->env_ipc_value = value;
+    dstenv->env_ipc_recving = false;
+    dstenv->env_ipc_from = curenv->env_id;
+    dstenv->env_status = ENV_RUNNABLE;
+
+    return 0;
 }
 
 // Block until a value is ready.  Record that you want to receive
@@ -330,7 +352,18 @@ static int
 sys_ipc_recv(void *dstva)
 {
 	// LAB 4: Your code here.
-	panic("sys_ipc_recv not implemented");
+    curenv->env_status = ENV_NOT_RUNNABLE;
+    curenv->env_ipc_recving = true;
+
+    if ((uintptr_t)dstva < UTOP) {
+        if ((uintptr_t)dstva % PGSIZE != 0)
+            return -E_INVAL;
+        else
+            curenv->env_ipc_dstva = dstva;
+    }
+
+    sys_yield();
+
 	return 0;
 }
 
