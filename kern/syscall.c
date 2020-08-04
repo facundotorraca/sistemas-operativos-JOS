@@ -202,7 +202,8 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 //		address space.
 //	-E_NO_MEM if there's no memory to allocate any necessary page tables.
 static int
-sys_page_map(envid_t srcenvid, void *srcva, envid_t dstenvid, void *dstva, int perm)
+sys_page_map(envid_t srcenvid, void *srcva, envid_t dstenvid, void *dstva, int perm,
+             bool checkperm)
 {
 	// Hint: This function is a wrapper around page_lookup() and
 	//   page_insert() from kern/pmap.c.
@@ -212,7 +213,6 @@ sys_page_map(envid_t srcenvid, void *srcva, envid_t dstenvid, void *dstva, int p
 	//   check the current permissions on the page.
 
 	// LAB 4: Your code here.
-
     if (perm & ~PTE_SYSCALL)
         return -E_INVAL;
 
@@ -225,18 +225,21 @@ sys_page_map(envid_t srcenvid, void *srcva, envid_t dstenvid, void *dstva, int p
     struct Env *e_src;
     struct Env *e_dst;
 
-    int r = envid2env(srcenvid, &e_src, 1);
+    int r = envid2env(srcenvid, &e_src, checkperm);
     if (r < 0)
         return r;
 
-    r = envid2env(dstenvid, &e_dst, 1);
+    r = envid2env(dstenvid, &e_dst, checkperm);
     if (r < 0)
         return r;
 
     pte_t *pte;
     struct PageInfo *p_src = page_lookup(e_src->env_pgdir, srcva, &pte);
 
-    if (!p_src || (perm & PTE_W) == ((uintptr_t)pte & PTE_W))
+    if (!p_src)
+        return -E_INVAL;
+
+    if ((perm & PTE_W) && !(*pte & PTE_W))
         return -E_INVAL;
 
     r = page_insert(e_dst->env_pgdir, p_src, dstva, perm);
@@ -316,14 +319,14 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 
     int r;
     if ((r = envid2env(envid, &dstenv, 0)) < 0)
-        return -E_BAD_ENV;
+        return r;
 
     if (!dstenv->env_ipc_recving)
         return -E_IPC_NOT_RECV;
 
     // if source want to send a page and dest wants to receive a page
     if ((uintptr_t)srcva < UTOP && (uintptr_t)dstenv->env_ipc_dstva < UTOP) {
-        if ((r = sys_page_map(0, srcva, envid, dstenv->env_ipc_dstva, perm & PTE_SYSCALL)) < 0)
+        if ((r = sys_page_map(0, srcva, envid, dstenv->env_ipc_dstva, perm, false)) < 0)
             return r;
         dstenv->env_ipc_perm = perm; // page transferred
     } else
@@ -352,15 +355,18 @@ static int
 sys_ipc_recv(void *dstva)
 {
 	// LAB 4: Your code here.
-    curenv->env_ipc_recving = true;
-    curenv->env_status = ENV_NOT_RUNNABLE;
-
     if ((uintptr_t)dstva < UTOP) {
         if ((uintptr_t)dstva % PGSIZE != 0)
             return -E_INVAL;
         else
             curenv->env_ipc_dstva = dstva;
     }
+
+    curenv->env_ipc_recving = true;
+    curenv->env_status = ENV_NOT_RUNNABLE;
+
+    // sys_yield is non-return so return value is set on %eax
+    curenv->env_tf.tf_regs.reg_eax = 0;
 
     sys_yield();
 
@@ -388,7 +394,7 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
         case SYS_page_alloc:
             return sys_page_alloc((envid_t)a1, (void *)a2, a3);
         case SYS_page_map:
-            return sys_page_map((envid_t)a1, (void *)a2, (envid_t)a3, (void *)a4, (int)a5);
+            return sys_page_map((envid_t)a1, (void *)a2, (envid_t)a3, (void *)a4, (int)a5, true);
         case SYS_page_unmap:
             return sys_page_unmap((envid_t)a1, (void *)a2);
         case SYS_getenvid:
