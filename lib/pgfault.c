@@ -28,11 +28,16 @@ set_pgfault_handler(void (*handler)(struct UTrapframe *utf))
 
 	if (_pgfault_handler == 0) {
 		// First time through!
-        if ((r = sys_page_alloc(0, (void *)UXSTACKTOP, PTE_W | PTE_U | PTE_P)) < 0) {
+        if ((r = sys_page_alloc(0, (void *)(UXSTACKTOP-PGSIZE), PTE_W | PTE_U | PTE_P)) < 0) {
             panic("Allocation failed for uxstack on pgfault handler");
         }
 	}
 
-	// Save handler pointer for assembly to call.
-	_pgfault_handler = handler;
+    r = sys_env_set_pgfault_upcall(0, _pgfault_upcall);
+    if (r<0)
+        panic("set_pgfault_handler failed!");
+
+    // Save handler pointer for assembly to call.
+    _pgfault_handler = handler;
+
 }

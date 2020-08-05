@@ -394,11 +394,15 @@ page_fault_handler(struct Trapframe *tf)
 
         // Inicializar a la dirección correcta por abajo de UXSTACKTOP.
         // No olvidar llamadas a user_mem_assert().
-        user_mem_assert(curenv, (void *)UXSTACKTOP, sizeof(struct UTrapframe), PTE_U | PTE_P);
-        u = (struct UTrapframe *)UXSTACKTOP;
+        user_mem_assert(curenv, (void *)(UXSTACKTOP-PGSIZE), sizeof(struct UTrapframe), PTE_U | PTE_P | PTE_W);
+        if (tf->tf_esp < UXSTACKTOP && tf->tf_esp >= UXSTACKTOP - PGSIZE) {
+            u = (struct UTrapframe *)(tf->tf_esp - 4 - sizeof(struct UTrapframe));
+        } else {
+            u = (struct UTrapframe *)(UXSTACKTOP - sizeof(struct UTrapframe));
+        }
 
         // Completar el UTrapframe, copiando desde "tf".
-        u->utf_fault_va = tf->tf_eip;
+        u->utf_fault_va = fault_va;
         u->utf_err = tf->tf_err;
         u->utf_regs = tf->tf_regs;
         u->utf_eip = tf->tf_eip;
