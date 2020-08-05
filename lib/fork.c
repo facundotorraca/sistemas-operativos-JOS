@@ -80,12 +80,6 @@ dup_or_share(envid_t dstenv, void *va, int perm)
         panic("sys_page_unmap: %e", r);
 }
 
-static int
-page_is_present(uintptr_t va)
-{
-    return (uvpd[PDX(va)] & PTE_P) && (uvpt[PGNUM(va)] & PTE_P);
-}
-
 static envid_t
 fork_v0(void)
 {
@@ -101,7 +95,7 @@ fork_v0(void)
 
     uintptr_t va;
     for (va = 0; va < UTOP; va += PGSIZE) {
-        if (page_is_present(va))
+        if ((uvpd[PDX(va)] & PTE_P) && (uvpt[PGNUM(va)] & PTE_P))
             dup_or_share(envid, (void *)va, PGOFF(uvpt[PGNUM(va)]) & PTE_SYSCALL);
     }
 
