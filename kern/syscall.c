@@ -138,7 +138,7 @@ static int
 sys_env_set_pgfault_upcall(envid_t envid, void *func)
 {
 	// LAB 4: Your code here.
-	struct Env *e;
+    struct Env *e;
 	int r = envid2env(envid, &e, 1);
 	if (r < 0)
 	    return r;

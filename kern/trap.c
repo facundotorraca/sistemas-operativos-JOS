@@ -394,7 +394,13 @@ page_fault_handler(struct Trapframe *tf)
 
         // Inicializar a la dirección correcta por abajo de UXSTACKTOP.
         // No olvidar llamadas a user_mem_assert().
-        user_mem_assert(curenv, (void *)(UXSTACKTOP-PGSIZE), sizeof(struct UTrapframe), PTE_U | PTE_P | PTE_W);
+
+        // Control user have space for exception stack
+        user_mem_assert(curenv, (void*)(UXSTACKTOP - PGSIZE), sizeof(struct UTrapframe), PTE_U | PTE_P | PTE_W);
+
+        // Control user have access to pgfault_handler
+        user_mem_assert(curenv, curenv->env_pgfault_upcall, PGSIZE, PTE_U | PTE_P | PTE_W);
+
         if (tf->tf_esp < UXSTACKTOP && tf->tf_esp >= UXSTACKTOP - PGSIZE) {
             u = (struct UTrapframe *)(tf->tf_esp - 4 - sizeof(struct UTrapframe));
         } else {
@@ -416,7 +422,6 @@ page_fault_handler(struct Trapframe *tf)
         // Saltar.
         env_run(curenv);
     }
-
 
 	// Destroy the environment that caused the fault.
 	cprintf("[%08x] user fault va %08x ip %08x\n",
