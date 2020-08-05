@@ -389,6 +389,31 @@ page_fault_handler(struct Trapframe *tf)
 
 	// LAB 4: Your code here.
 
+    if (curenv->env_pgfault_upcall) {
+        struct UTrapframe *u;
+
+        // Inicializar a la dirección correcta por abajo de UXSTACKTOP.
+        // No olvidar llamadas a user_mem_assert().
+        user_mem_assert(curenv, (void *)UXSTACKTOP, sizeof(struct UTrapframe), PTE_U | PTE_P);
+        u = (struct UTrapframe *)UXSTACKTOP;
+
+        // Completar el UTrapframe, copiando desde "tf".
+        u->utf_fault_va = tf->tf_eip;
+        u->utf_err = tf->tf_err;
+        u->utf_regs = tf->tf_regs;
+        u->utf_eip = tf->tf_eip;
+        u->utf_eflags = tf->tf_eflags;
+        u->utf_esp = tf->tf_esp;
+
+        // Cambiar a dónde se va a ejecutar el proceso.
+        tf->tf_eip = (uintptr_t)curenv->env_pgfault_upcall;
+        tf->tf_esp = (uintptr_t)u;
+
+        // Saltar.
+        env_run(curenv);
+    }
+
+
 	// Destroy the environment that caused the fault.
 	cprintf("[%08x] user fault va %08x ip %08x\n",
 	        curenv->env_id,
