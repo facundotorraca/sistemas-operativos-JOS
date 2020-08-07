@@ -3,6 +3,8 @@
 #include <inc/string.h>
 #include <inc/lib.h>
 
+#define LG_PGSIZE 4194304 //4*1024*1024 4mb
+
 // PTE_COW marks copy-on-write page table entries.
 // It is one of the bits explicitly allocated to user processes (PTE_AVAIL).
 #define PTE_COW 0x800
@@ -61,6 +63,9 @@ duppage(envid_t envid, unsigned pn)
 static void
 dup_or_share(envid_t dstenv, void *va, int perm)
 {
+    if (!(perm & PTE_P))
+        return;
+
     int r;
     if ((perm & PTE_W) == 0) {
         if ((r = sys_page_map(0, va, dstenv, va, perm)) < 0)
@@ -125,7 +130,36 @@ fork_v0(void)
 envid_t
 fork(void)
 {
-	return fork_v0();
+    set_pgfault_handler(pgfault);
+
+    envid_t envid = sys_exofork();
+
+    if (envid < 0)
+        panic("sys_exofork: %e", envid);
+
+    if (envid == 0) {
+        thisenv = &envs[ENVX(sys_getenvid())];
+        set_pgfault_handler(pgfault);
+        return 0;
+    }
+
+    uintptr_t ptva; // page table start va
+    for (ptva = 0; ptva < UTOP; ptva += LG_PGSIZE) {
+        if ((uvpd[PDX(ptva)] & PTE_P)) {
+
+            uintptr_t maxVa = (ptva + LG_PGSIZE) < USTACKTOP ?
+                              (ptva + LG_PGSIZE) : USTACKTOP;
+
+            for (uintptr_t va = ptva; va < maxVa; va += PGSIZE)
+                dup_or_share(envid, (void *)va, PGOFF(uvpt[PGNUM(va)]) & PTE_SYSCALL);
+        }
+    }
+
+    int r = sys_env_set_status(envid, ENV_RUNNABLE);
+    if (r < 0)
+        return r;
+
+    return envid;
 }
 
 // Challenge!
