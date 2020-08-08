@@ -26,7 +26,14 @@ pgfault(struct UTrapframe *utf)
 	//   Use the read-only page table mappings at uvpt
 	//   (see <inc/memlayout.h>).
 
-	// LAB 4: Your code here.
+	if (!(err & FEC_WR) || !(err & FEC_PR)) {
+        panic("Page fault not copy on write");
+    }
+
+    int perm = uvpt[PGNUM((uintptr_t)addr)] & PTE_SYSCALL;
+    if (!(perm & PTE_COW)) {
+        panic("Page fault not copy on write");
+    }
 
 	// Allocate a new page, map it at a temporary location (PFTEMP),
 	// copy the data from the old page to the new page, then move the new
@@ -34,9 +41,18 @@ pgfault(struct UTrapframe *utf)
 	// Hint:
 	//   You should make three system calls.
 
-	// LAB 4: Your code here.
+    if ((r = sys_page_alloc(0, PFTEMP, (perm & ~PTE_COW) | PTE_W)) < 0)
+        panic("sys_page_alloc: %e", r);
 
-	panic("pgfault not implemented");
+    memmove(PFTEMP, addr, PGSIZE);
+
+    if ((r = sys_page_map(0, PFTEMP, 0, addr, (perm & ~PTE_COW) | PTE_W)) < 0) {
+        panic("sys_page_map: %e", r);
+    }
+
+    if ((r = sys_page_unmap(0, PFTEMP)) < 0)
+        panic("sys_page_unmap: %e", r);
+
 }
 
 //
@@ -55,8 +71,25 @@ duppage(envid_t envid, unsigned pn)
 {
 	int r;
 
-	// LAB 4: Your code here.
-	panic("duppage not implemented");
+	pte_t pg = uvpt[pn];
+    void *va = (void *)(pn * PGSIZE);
+
+	//page not present
+    if (!(pg & PTE_P)) {
+        return 0;
+    }
+
+    //page read only
+    if (!(pg & (PTE_W | PTE_COW))) {
+        if ((r = sys_page_map(0, va, envid, va, pg & PTE_SYSCALL)) < 0)
+            panic("sys_page_map: %e", r);
+    } else {
+        if ((r = sys_page_map(0, va, envid, va, (pg & (PTE_SYSCALL & ~PTE_W)) | PTE_COW)) < 0)
+            panic("sys_page_map: %e", r);
+        if ((r = sys_page_map(0, va, 0, va, (pg & (PTE_SYSCALL & ~PTE_W)) | PTE_COW)) < 0)
+            panic("sys_page_map: %e", r);
+    }
+
 	return 0;
 }
 
@@ -130,7 +163,7 @@ fork_v0(void)
 envid_t
 fork(void)
 {
-    set_pgfault_handler(pgfault);
+    set_pgfault_handler(&pgfault);
 
     envid_t envid = sys_exofork();
 
@@ -139,7 +172,7 @@ fork(void)
 
     if (envid == 0) {
         thisenv = &envs[ENVX(sys_getenvid())];
-        set_pgfault_handler(pgfault);
+        set_pgfault_handler(&pgfault);
         return 0;
     }
 
@@ -152,6 +185,7 @@ fork(void)
 
             for (uintptr_t va = ptva; va < maxVa; va += PGSIZE)
                 dup_or_share(envid, (void *)va, PGOFF(uvpt[PGNUM(va)]) & PTE_SYSCALL);
+                //duppage(envid, PGNUM(va));
         }
     }
 

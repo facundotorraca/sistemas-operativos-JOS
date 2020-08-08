@@ -393,19 +393,15 @@ page_fault_handler(struct Trapframe *tf)
         struct UTrapframe *u;
 
         // Inicializar a la dirección correcta por abajo de UXSTACKTOP.
-        // No olvidar llamadas a user_mem_assert().
-
-        // Control user have space for exception stack
-        user_mem_assert(curenv, (void*)(UXSTACKTOP - PGSIZE), sizeof(struct UTrapframe), PTE_U | PTE_P | PTE_W);
-
-        // Control user have access to pgfault_handler
-        user_mem_assert(curenv, curenv->env_pgfault_upcall, PGSIZE, PTE_U | PTE_P | PTE_W);
 
         if (tf->tf_esp < UXSTACKTOP && tf->tf_esp >= UXSTACKTOP - PGSIZE) {
             u = (struct UTrapframe *)(tf->tf_esp - 4 - sizeof(struct UTrapframe));
         } else {
             u = (struct UTrapframe *)(UXSTACKTOP - sizeof(struct UTrapframe));
         }
+
+        // Check that the address assigned to user trapframe is valid
+        user_mem_assert(curenv, u, sizeof(struct UTrapframe), PTE_U | PTE_P | PTE_W);
 
         // Completar el UTrapframe, copiando desde "tf".
         u->utf_fault_va = fault_va;
