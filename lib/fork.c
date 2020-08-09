@@ -16,43 +16,42 @@
 static void
 pgfault(struct UTrapframe *utf)
 {
-	void *addr = (void *) utf->utf_fault_va;
+	void *addr = (void *)ROUNDDOWN(utf->utf_fault_va, PGSIZE);
 	uint32_t err = utf->utf_err;
-	int r;
 
 	// Check that the faulting access was (1) a write, and (2) to a
 	// copy-on-write page.  If not, panic.
 	// Hint:
 	//   Use the read-only page table mappings at uvpt
 	//   (see <inc/memlayout.h>).
+    if (!(err & FEC_PR))
+        panic("Page not mapped");
 
-	if (!(err & FEC_WR) || !(err & FEC_PR)) {
-        panic("Page fault not copy on write");
-    }
+    if (!(err & FEC_WR))
+        panic("Page fault for reading");
 
     int perm = uvpt[PGNUM((uintptr_t)addr)] & PTE_SYSCALL;
-    if (!(perm & PTE_COW)) {
+
+    if (!(perm & PTE_COW))
         panic("Page fault not copy on write");
-    }
 
 	// Allocate a new page, map it at a temporary location (PFTEMP),
 	// copy the data from the old page to the new page, then move the new
 	// page to the old page's address.
 	// Hint:
 	//   You should make three system calls.
+    int r;
 
     if ((r = sys_page_alloc(0, PFTEMP, (perm & ~PTE_COW) | PTE_W)) < 0)
         panic("sys_page_alloc: %e", r);
 
     memmove(PFTEMP, addr, PGSIZE);
 
-    if ((r = sys_page_map(0, PFTEMP, 0, addr, (perm & ~PTE_COW) | PTE_W)) < 0) {
+    if ((r = sys_page_map(0, PFTEMP, 0, addr, (perm & ~PTE_COW) | PTE_W)) < 0)
         panic("sys_page_map: %e", r);
-    }
 
     if ((r = sys_page_unmap(0, PFTEMP)) < 0)
         panic("sys_page_unmap: %e", r);
-
 }
 
 //
@@ -69,24 +68,25 @@ pgfault(struct UTrapframe *utf)
 static int
 duppage(envid_t envid, unsigned pn)
 {
-	int r;
-
 	pte_t pg = uvpt[pn];
     void *va = (void *)(pn * PGSIZE);
 
-	//page not present
-    if (!(pg & PTE_P)) {
+	// Page not present
+    if (!(pg & PTE_P))
         return 0;
-    }
 
-    //page read only
-    if (!(pg & (PTE_W | PTE_COW))) {
-        if ((r = sys_page_map(0, va, envid, va, pg & PTE_SYSCALL)) < 0)
-            panic("sys_page_map: %e", r);
-    } else {
-        if ((r = sys_page_map(0, va, envid, va, (pg & (PTE_SYSCALL & ~PTE_W)) | PTE_COW)) < 0)
-            panic("sys_page_map: %e", r);
-        if ((r = sys_page_map(0, va, 0, va, (pg & (PTE_SYSCALL & ~PTE_W)) | PTE_COW)) < 0)
+    // Copy all perms without PTE_W
+    int perm = pg & PTE_SYSCALL & ~PTE_W;
+
+    if ((pg & PTE_W) || (pg & PTE_COW))
+        perm |= PTE_COW;
+
+    int r;
+    if ((r = sys_page_map(0, va, envid, va, perm)) < 0)
+        panic("sys_page_map: %e", r);
+
+    if (perm & PTE_COW) {
+        if ((r = sys_page_map(0, va, 0, va, perm)) < 0)
             panic("sys_page_map: %e", r);
     }
 
@@ -160,36 +160,46 @@ fork_v0(void)
 //   Neither user exception stack should ever be marked copy-on-write,
 //   so you must allocate a new page for the child's user exception stack.
 //
+
 envid_t
 fork(void)
 {
     set_pgfault_handler(&pgfault);
 
     envid_t envid = sys_exofork();
-
     if (envid < 0)
         panic("sys_exofork: %e", envid);
 
     if (envid == 0) {
         thisenv = &envs[ENVX(sys_getenvid())];
-        set_pgfault_handler(&pgfault);
         return 0;
     }
 
     uintptr_t ptva; // page table start va
     for (ptva = 0; ptva < UTOP; ptva += LG_PGSIZE) {
-        if ((uvpd[PDX(ptva)] & PTE_P)) {
+        if (uvpd[PDX(ptva)] & PTE_P) {
 
             uintptr_t maxVa = (ptva + LG_PGSIZE) < USTACKTOP ?
                               (ptva + LG_PGSIZE) : USTACKTOP;
 
             for (uintptr_t va = ptva; va < maxVa; va += PGSIZE)
-                dup_or_share(envid, (void *)va, PGOFF(uvpt[PGNUM(va)]) & PTE_SYSCALL);
-                //duppage(envid, PGNUM(va));
+                duppage(envid, PGNUM(va));
         }
     }
 
-    int r = sys_env_set_status(envid, ENV_RUNNABLE);
+    int r;
+
+    // The parent sets the user page fault entrypoint
+    // for the child to look like its own.
+    r = sys_page_alloc(envid, (void *)(UXSTACKTOP-PGSIZE), PTE_W | PTE_U | PTE_P);
+    if (r < 0)
+        panic("Child exception stack memory allocation failed");
+
+    r = sys_env_set_pgfault_upcall(envid, thisenv->env_pgfault_upcall);
+    if (r < 0)
+        panic("Child set pgfault handler failed!");
+
+    r = sys_env_set_status(envid, ENV_RUNNABLE);
     if (r < 0)
         return r;
 
