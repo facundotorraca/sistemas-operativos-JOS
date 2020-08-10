@@ -71,7 +71,50 @@ Lo que sucede es que el proceso que llame a kill va enviar la señal 9 a todos l
 
 # dumbfork
 
-RESPONDER
+## 1. Si, antes de llamar a dumbfork(), el proceso se reserva a sí mismo una página con sys_page_alloc() ¿se propagará una copia al proceso hijo? ¿Por qué?
+Si, ya que dumbfork va a copiar todas las todas las paginas que se encuentren mapeadas entre UTEXT (direccion virtual en la que comienza el HEAP y el DATA SEGMENT del proceso) y USTACKTOP
+en el directorio de paginas del proceso indicado, por lo que si se reservo justo antes una pagina con page alloc, esta será copiada.
+
+## 2. ¿Se preserva el estado de solo-lectura en las páginas copiadas? Mostrar, con código en espacio de usuario, cómo saber si una dirección de memoria es modificable por el proceso, o no. (Ayuda: usar las variables globales uvpd y/o uvpt.)
+
+No se preserva, ya que todas las copias de paginas generadas se les asignan los mismos permisos (bit de usuario, bit de presencia y bit de escritura permitida). Para saber si una direccion es modificable por el proceso se pueden usar los arreglos auxiliares de solo lectura uvpd (que guarda las direcciones fisicas de las tablas de paginas del proceso, asi como los permisos) y uvpt (que si se le indica el numero de una pagina especifica, a partir de una direccion virtual, permite obtener una entrada de una tabla de pagina especifica, asi como los permisos de la misma). Entonces para ver si la direccion va es modificable por el proceso basta con verificar que: 
+	uvpd[PDX(va)] & PTE_P
+sea igual a PTE_P y luego que: 
+	uvpt[PGNUM(va)] & (PTE_P | PTE_U | PTE_W) 
+sea igual a (PTE_P | PTE_U | PTE_W).
+
+
+## 3. Describir el funcionamiento de la función duppage().
+
+Consiste en:
+ - Reservar una pagina vacia en una direccion virtual del proceso hijo, con los permisos (PTE_U | PTE_P | PTE_W)
+ - Mapear una direccion virtual auxiliar indicada del proceso padre a la pagina vacia reservada en directorio del hijo
+ - Copiar la pagina en la direccion virtual indicada en el directorio del padre a la pagina en la direccion auxiliar, logrando que la direccion virtual del hijo que tambien apuntaba a esa pagina vacia ahora apunte a la copia de la pagina del padre.
+ - Desmapear la direccion virtual auxiliar en el directorio del padre, haciendo que el unico vinculo a la pagina nueva sea el de la direccion virtual en el directorio del hijo.
+
+## 4. Supongamos que se añade a duppage() un argumento booleano que indica si la página debe quedar como solo-lectura en el proceso hijo:
+
+### - indicar qué llamada adicional se debería hacer si el booleano es true
+Se deberia llamar al final a sys_page_map(dstenv, addr, dstenv, addr, PTE_P|PTE_U), de forma de remapear la pagina a la misma direccion pero quitandole el permiso del PTE_W.
+
+### - describir un algoritmo alternativo que no aumente el número de llamadas al sistema, que debe quedar en 3 (1 × alloc, 1 × map, 1 × unmap).
+El codigo puede hacerse de la siguiente manera, de forma de reservar una pagina vacia en una direccion auxiliar del proceso padre y mapear la direccion virtual del hijo como solo lectura a esa pagina vacia del padre, logrando mapear una pagina que en principio tiene permiso de escritura como una de solo lectura a los ojos del proceso hijo:
+
+    int perm = PTE_P | PTE_U;
+    if ((uvpd[PDX((uintptr_t)addr)] & PTE_P) == PTE_P && (uvpt[PGNUM((uintptr_t)addr)] & (PTE_P | PTE_U | PTE_W)) == (PTE_P | PTE_U | PTE_W))
+        perm |= PTE_W;
+    if ((r = sys_page_alloc(0, UTEMP, PTE_P|PTE_U|PTE_W)) < 0)
+        panic("sys_page_alloc: %e", r);
+    if ((r = sys_page_map(0, UTEMP, dstenv, addr, perm)) < 0)
+        panic("sys_page_map: %e", r);
+    memmove(UTEMP, addr, PGSIZE);
+    if ((r = sys_page_unmap(0, UTEMP)) < 0)
+        panic("sys_page_unmap: %e", r);
+
+
+## 5. ¿Por qué se usa ROUNDDOWN(&addr) para copiar el stack? ¿Qué es addr y por qué, si el stack crece hacia abajo, se usa ROUNDDOWN y no ROUNDUP?
+Debido a que las paginas se copian desde la direccion ROUNDDOWN(va, PGSIZE) hasta ROUNDDOWN(va, PGSIZE) + PGSIZE, por lo que si se redondeara para arriba se copiaría.
+
 
 # multicore init
 

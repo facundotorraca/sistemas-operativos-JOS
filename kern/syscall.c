@@ -370,11 +370,6 @@ sys_ipc_recv(void *dstva)
     curenv->env_ipc_recving = true;
     curenv->env_status = ENV_NOT_RUNNABLE;
 
-    // sys_yield is non-return so return value is set on %eax
-    curenv->env_tf.tf_regs.reg_eax = 0;
-
-    sys_yield();
-
 	return 0;
 }
 
