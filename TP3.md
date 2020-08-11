@@ -118,11 +118,232 @@ Debido a que las paginas se copian desde la direccion ROUNDDOWN(va, PGSIZE) hast
 
 # multicore init
 
-RESPONDER
+## 1. ¿Qué código copia, y a dónde, la siguiente línea de la función boot_aps()?
+### memmove(code, mpentry_start, mpentry_end - mpentry_start);
+Esta linea se encarga de copiar el codigo escrito en mpentry.s que se encuentra entre las direcciones cargadas inicialmente en memoria entre mpentry_start y mpentry_end en la direccion física 0x00007000 (que justamente esta cargada en la variable code como la direccion virtual 0xf0007000).
+
+## 2. ¿Para qué se usa la variable global mpentry_kstack? ¿Qué ocurriría si el espacio para este stack se reservara en el archivo kern/mpentry.S, de manera similar a bootstack en el archivo kern/entry.S?
+Se usa para asignar la direccion de inicio de cada stack para el kernel en cada uno de los CPUs, ya que cada CPU necesita tener su propio stack para poder hacer uso del kernel de manera simultanea. 
+Si la direccion se mapeara directamente en el codigo de mpentry.s, los NCPU - 1 (los CPUs que no son el CPU 0) tendrian cada todos mapeado su Kstack a la misma dirección.
+
+## 3. Cuando QEMU corre con múltiples CPUs, éstas se muestran en GDB como hilos de ejecución separados. Mostrar una sesión de GDB en la que se muestre cómo va cambiando el valor de la variable global
+
+mpentry_kstack:
+
+$ make qemu-nox-gdb CPUS=4
+...
+
+// En otra terminal:
+$ make gdb
+(gdb) watch mpentry_kstack
+Hardware watchpoint 1: mpentry_kstack
+
+(gdb) continue
+Continuing.
+The target architecture is assumed to be i386
+=> 0xf0100186 <boot_aps+110>:	mov    %esi,%ecx
+
+Thread 1 hit Hardware watchpoint 1: mpentry_kstack
+
+Old value = (void *) 0x0
+New value = (void *) 0xf0252000 <percpu_kstacks+65536>
+boot_aps () at kern/init.c:107
+107			lapic_startap(c->cpu_id, PADDR(code));
+
+(gdb) bt
+#0  boot_aps () at kern/init.c:107
+#1  0xf010023c in i386_init () at kern/init.c:56
+#2  0xf01064c6 in ?? ()
+#3  0xf0100047 in relocated () at kern/entry.S:89
+
+(gdb) info threads
+Id   Target Id                    Frame 
+* 1    Thread 1.1 (CPU#0 [running]) boot_aps () at kern/init.c:107
+  2    Thread 1.2 (CPU#1 [halted ]) 0x000fd08c in ?? ()
+  3    Thread 1.3 (CPU#2 [halted ]) 0x000fd08c in ?? ()
+  4    Thread 1.4 (CPU#3 [halted ]) 0x000fd08c in ?? ()
+
+(gdb) continue
+Continuing.
+=> 0xf0100186 <boot_aps+110>:	mov    %esi,%ecx
+
+Thread 1 hit Hardware watchpoint 1: mpentry_kstack
+
+Old value = (void *) 0xf0252000 <percpu_kstacks+65536>
+New value = (void *) 0xf025a000 <percpu_kstacks+98304>
+boot_aps () at kern/init.c:107
+107			lapic_startap(c->cpu_id, PADDR(code));
+
+(gdb) info threads
+Id   Target Id                    Frame 
+* 1    Thread 1.1 (CPU#0 [running]) boot_aps () at kern/init.c:107
+  2    Thread 1.2 (CPU#1 [running]) 0xf010604c in holding (lock=0x1)
+    at kern/spinlock.c:42
+  3    Thread 1.3 (CPU#2 [halted ]) 0x000fd08c in ?? ()
+  4    Thread 1.4 (CPU#3 [halted ]) 0x000fd08c in ?? ()
+
+(gdb) thread 2
+[Switching to thread 2 (Thread 1.2)]
+#0  0xf010604c in holding (lock=0x1) at kern/spinlock.c:42
+42		return lock->locked && lock->cpu == thiscpu;
+
+(gdb) bt
+#0  0xf010604c in holding (lock=0x1) at kern/spinlock.c:42
+#1  0xfee00000 in ?? ()
+#2  0xf0106096 in spin_lock (lk=0x0) at kern/spinlock.c:64
+#3  0x00000000 in ?? ()
+
+(gdb) p cpunum()
+$1 = 1
+
+(gdb) thread 1
+[Switching to thread 1 (Thread 1.1)]
+#0  boot_aps () at kern/init.c:107
+107			lapic_startap(c->cpu_id, PADDR(code));
+
+(gdb) p cpunum()
+$2 = 0
+
+(gdb) continue
+=> 0xf0100186 <boot_aps+110>:	mov    %esi,%ecx
+
+Thread 1 hit Hardware watchpoint 1: mpentry_kstack
+
+Old value = (void *) 0xf025a000 <percpu_kstacks+98304>
+New value = (void *) 0xf0262000 <percpu_kstacks+131072>
+boot_aps () at kern/init.c:107
+107			lapic_startap(c->cpu_id, PADDR(code));
+
+
+## 4. En el archivo kern/mpentry.S se puede leer:
+
+#####  # We cannot use kern_pgdir yet because we are still
+#####  # running at a low EIP.
+#####  movl $(RELOC(entry_pgdir)), %eax
+
+### - ¿Qué valor tendrá el registro %eip cuando se ejecute esa línea? (Responder con redondeo a 12 bits, justificando desde qué región de memoria se está ejecutando este código)
+
+RTA
+
+### - ¿Se detiene en algún momento la ejecución si se pone un breakpoint en mpentry_start? ¿Por qué?
+
+
+No se detiene, ya que la ejecución del codigo de mpentry_start va a pasar por la direccion virtual 0xf0007000. Como esa direccion fue remapeada, al momento de setear el breakpoint mpentry_start apunta a una dirección virtual distinta.
+
+
+^^^^^^
+
+REVISAR
+REVISAR
+REVISAR
+REVISAR
+REVISAR
+REVISAR
+REVISAR
+REVISAR
+REVISAR
+
+
+
+
+
+
+## 5. Con GDB, mostrar el valor exacto de %eip y mpentry_kstack cuando se ejecuta la instrucción anterior en el último AP. Se recomienda usar, por ejemplo:
+
+(gdb) b *0x7000 thread 4
+Breakpoint 1 at 0x7000
+(gdb) continue
+Continuing.
+
+Thread 2 received signal SIGTRAP, Trace/breakpoint trap.
+[Switching to Thread 1.2]
+The target architecture is assumed to be i8086
+[ 700:   0]    0x7000:	cli    
+0x00000000 in ?? ()
+
+(gdb) disable 1
+
+// Saltar código 16 bits
+(gdb) si 10
+The target architecture is assumed to be i386
+=> 0x7020:	mov    $0x10,%ax
+0x00007020 in ?? ()
+
+(gdb) x/10i $eip
+=> 0x7020:	mov    $0x10,%ax
+   0x7024:	mov    %eax,%ds
+   0x7026:	mov    %eax,%es
+   0x7028:	mov    %eax,%ss
+   0x702a:	mov    $0x0,%ax
+   0x702e:	mov    %eax,%fs
+   0x7030:	mov    %eax,%gs
+   0x7032:	mov    $0x121000,%eax
+   0x7037:	mov    %eax,%cr3
+   0x703a:	mov    %cr4,%eax
+
+(gdb) watch $eax == 0x121000
+Watchpoint 2: $eax == 0x121000
+
+(gdb) continue
+Continuing.
+=> 0x7037:	mov    %eax,%cr3
+
+Thread 2 hit Watchpoint 2: $eax == 0x121000
+
+Old value = 0
+New value = 1
+0x00007037 in ?? ()
+
+(gdb) p $eip
+$1 = (void (*)()) 0x7037
+
+(gdb) p mpentry_kstack
+$2 = (void *) 0x0
+
+(gdb) si ...
+...
+...
+(gdb) p mpentry_kstack
+...
+
+
+
+RELLENAR
+RELLENAR
+RELLENAR
+
+
+
 
 # ipc recv
 
-RESPONDER
+## Un proceso podría intentar enviar el valor númerico -E_INVAL vía ipc_send(). ¿Cómo es posible distinguir si es un error, o no? En estos casos:
+
+// Versión A
+envid_t src = -1;
+int r = ipc_recv(&src, 0, NULL);
+
+if (r < 0)
+  if (/* ??? */)
+    puts("Hubo error.");
+  else
+    puts("Valor negativo correcto.")
+
+y
+
+// Versión B
+int r = ipc_recv(NULL, 0, NULL);
+
+if (r < 0)
+  if (/* ??? */)
+    puts("Hubo error.");
+  else
+    puts("Valor negativo correcto.")
+
+En el caso A habria que verificar si src es 0 o no, en caso de que el valor enviado sea efectivamente -E_INVAL la variable src va a tomar el valor del envid del proceso que envio dicho valor, en caso de error y lo que devuelva ipc_recv sea -E_INVAL el valor de src será asignado como 0.
+
+Para el caso B habria que hacer un paso extra ademas de la comprobacion en el if, para asegurarnos de que el valor obtenido haya sido efectivamente enviado por otro proceso tenemos que asignar el atributo thisenv->env_ipc_value en 0 (o en algun valor distinto de -E_INVAL) y en el if verificar si efectivamente thisenv->env_ipc_value != -E_INVAL (para el caso en el que hubo error) y si se ve que thisenv->env_ipc_value es igual a -E_INVAL entonces tuvo que haber sido el valor enviado por otro proceso.
+
 
 # try ipc send
 
