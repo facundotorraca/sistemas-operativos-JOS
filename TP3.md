@@ -223,39 +223,19 @@ boot_aps () at kern/init.c:107
 
 ### - ¿Qué valor tendrá el registro %eip cuando se ejecute esa línea? (Responder con redondeo a 12 bits, justificando desde qué región de memoria se está ejecutando este código)
 
-RTA
-Redondeo a 12 bits: Los primeros 12 bits son 0.
-Min 10
-
+Como la funcion en la que se encuentra esa línea comienza en la direccion 0x7000 y esa linea se encuentra a solo 19 instrucciones de distancia del principio de la función, se tiene que el valor del registro %eip si se lo redondea a 12 bits cuando llegue a "movl $(RELOC(entry_pgdir)), %eax" va a seguir siendo 0x7000 debido a que el offset entre el inicio del codigo y la instruccion se puede representar en menos de 12 bits.
 
 ### - ¿Se detiene en algún momento la ejecución si se pone un breakpoint en mpentry_start? ¿Por qué?
-
 
 No se detiene, ya que la ejecución del codigo de mpentry_start va a pasar por la direccion virtual 0xf0007000. Como esa direccion fue remapeada, al momento de setear el breakpoint mpentry_start apunta a una dirección virtual distinta.
 
 
-^^^^^^
+## 5. Con GDB, mostrar el valor exacto de %eip y mpentry_kstack cuando se ejecuta la instrucción anterior en el último AP:
 
-REVISAR
-REVISAR
-REVISAR
-REVISAR
-REVISAR
-REVISAR
-REVISAR
-REVISAR
-REVISAR
-
-
-
-
-
-
-## 5. Con GDB, mostrar el valor exacto de %eip y mpentry_kstack cuando se ejecuta la instrucción anterior en el último AP. Se recomienda usar, por ejemplo:
-
-(gdb) b *0x7000 thread 4
+(gdb) b *0x7000
 Breakpoint 1 at 0x7000
-(gdb) continue
+
+(gdb) c
 Continuing.
 
 Thread 2 received signal SIGTRAP, Trace/breakpoint trap.
@@ -266,7 +246,51 @@ The target architecture is assumed to be i8086
 
 (gdb) disable 1
 
-// Saltar código 16 bits
+(gdb) si
+[ 700:   1]    0x7001:	xor    %eax,%eax
+0x00000001 in ?? ()
+
+(gdb) enable 1
+
+(gdb) c
+Continuing.
+
+Thread 3 received signal SIGTRAP, Trace/breakpoint trap.
+[Switching to Thread 1.3]
+[ 700:   0]    0x7000:	cli    
+0x00000000 in ?? ()
+
+(gdb) info threads
+  Id   Target Id                    Frame 
+  1    Thread 1.1 (CPU#0 [running]) lapic_startap (apicid=-268406784, 
+    addr=4027715544) at kern/lapic.c:174
+  2    Thread 1.2 (CPU#1 [running]) spin_lock (lk=0x0) at kern/spinlock.c:71
+* 3    Thread 1.3 (CPU#2 [running]) 0x00000000 in ?? ()
+  4    Thread 1.4 (CPU#3 [halted ]) 0x000fd08c in ?? ()
+
+(gdb) dis 1
+
+(gdb) si
+[ 700:   1]    0x7001:	xor    %eax,%eax
+0x00000001 in ?? ()
+
+(gdb) en 1
+
+(gdb) c
+Continuing.
+
+Thread 4 received signal SIGTRAP, Trace/breakpoint trap.
+[Switching to Thread 1.4]
+[ 700:   0]    0x7000:	cli    
+0x00000000 in ?? ()
+
+(gdb) info threads
+  Id   Target Id                    Frame 
+  1    Thread 1.1 (CPU#0 [running]) boot_aps () at kern/init.c:109
+  2    Thread 1.2 (CPU#1 [running]) spin_lock (lk=0x0) at kern/spinlock.c:71
+  3    Thread 1.3 (CPU#2 [running]) spin_lock (lk=0x0) at kern/spinlock.c:71
+* 4    Thread 1.4 (CPU#3 [running]) 0x00000000 in ?? ()
+
 (gdb) si 10
 The target architecture is assumed to be i386
 => 0x7020:	mov    $0x10,%ax
@@ -287,11 +311,11 @@ The target architecture is assumed to be i386
 (gdb) watch $eax == 0x121000
 Watchpoint 2: $eax == 0x121000
 
-(gdb) continue
+(gdb) c
 Continuing.
 => 0x7037:	mov    %eax,%cr3
 
-Thread 2 hit Watchpoint 2: $eax == 0x121000
+Thread 4 hit Watchpoint 2: $eax == 0x121000
 
 Old value = 0
 New value = 1
@@ -300,22 +324,108 @@ New value = 1
 (gdb) p $eip
 $1 = (void (*)()) 0x7037
 
-(gdb) p mpentry_kstack
+(gdb) p mpentry_kstack 
 $2 = (void *) 0x0
 
-(gdb) si ...
-...
-...
-(gdb) p mpentry_kstack
-...
+(gdb) x/10i $eip
+=> 0x7037:	mov    %eax,%cr3
+   0x703a:	mov    %cr4,%eax
+   0x703d:	or     $0x10,%eax
+   0x7040:	mov    %eax,%cr4
+   0x7043:	mov    %cr0,%eax
+   0x7046:	or     $0x80010001,%eax
+   0x704b:	mov    %eax,%cr0
+   0x704e:	mov    0xf0240e84,%esp
+   0x7054:	mov    $0x0,%ebp
+   0x7059:	mov    $0xf0100250,%eax
 
+(gdb) x/10i $eip
+=> 0x7037:	mov    %eax,%cr3
+   0x703a:	mov    %cr4,%eax
+   0x703d:	or     $0x10,%eax
+   0x7040:	mov    %eax,%cr4
+   0x7043:	mov    %cr0,%eax
+   0x7046:	or     $0x80010001,%eax
+   0x704b:	mov    %eax,%cr0
+   0x704e:	mov    0xf0240e84,%esp
+   0x7054:	mov    $0x0,%ebp
+   0x7059:	mov    $0xf0100250,%eax
 
+(gdb) info threads
+  Id   Target Id                    Frame 
+  1    Thread 1.1 (CPU#0 [running]) boot_aps () at kern/init.c:109
+  2    Thread 1.2 (CPU#1 [running]) spin_lock (lk=0x0) at kern/spinlock.c:71
+  3    Thread 1.3 (CPU#2 [running]) spin_lock (lk=0x0) at kern/spinlock.c:71
+* 4    Thread 1.4 (CPU#3 [running]) 0x00007037 in ?? ()
 
-RELLENAR
-RELLENAR
-RELLENAR
+(gdb) si
+=> 0x703a:	mov    %cr4,%eax
+0x0000703a in ?? ()
 
+(gdb) p mpentry_kstack 
+$3 = (void *) 0x0
 
+(gdb) x/10i $eip
+=> 0x703a:	mov    %cr4,%eax
+   0x703d:	or     $0x10,%eax
+   0x7040:	mov    %eax,%cr4
+   0x7043:	mov    %cr0,%eax
+   0x7046:	or     $0x80010001,%eax
+   0x704b:	mov    %eax,%cr0
+   0x704e:	mov    0xf0240e84,%esp
+   0x7054:	mov    $0x0,%ebp
+   0x7059:	mov    $0xf0100250,%eax
+   0x705e:	call   *%eax
+
+(gdb) si
+=> 0x703d:	or     $0x10,%eax
+
+Thread 4 hit Watchpoint 2: $eax == 0x121000
+
+Old value = 1
+New value = 0
+0x0000703d in ?? ()
+
+(gdb) si
+=> 0x7040:	mov    %eax,%cr4
+0x00007040 in ?? ()
+
+(gdb) si
+=> 0x7043:	mov    %cr0,%eax
+0x00007043 in ?? ()
+
+(gdb) si
+=> 0x7046:	or     $0x80010001,%eax
+0x00007046 in ?? ()
+
+(gdb) si
+=> 0x704b:	mov    %eax,%cr0
+0x0000704b in ?? ()
+
+(gdb) si
+=> 0x704e:	mov    0xf0240e84,%esp
+0x0000704e in ?? ()
+
+(gdb) x/10i $eip
+=> 0x704e:	mov    0xf0240e84,%esp
+   0x7054:	mov    $0x0,%ebp
+   0x7059:	mov    $0xf0100250,%eax
+   0x705e:	call   *%eax
+   0x7060:	jmp    0x7060
+   0x7062:	xchg   %ax,%ax
+   0x7064:	add    %al,(%eax)
+   0x7066:	add    %al,(%eax)
+   0x7068:	add    %al,(%eax)
+   0x706a:	add    %al,(%eax)
+
+(gdb) si
+=> 0x7054:	mov    $0x0,%ebp
+0x00007054 in ?? ()
+
+(gdb) p mpentry_kstack 
+$4 = (void *) 0xf0262000 <percpu_kstacks+131072>
+
+Finalmente mpentry_kstack se mapea en la direccion 0xf0262000
 
 
 # ipc recv
