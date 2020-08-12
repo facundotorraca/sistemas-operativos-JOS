@@ -224,6 +224,9 @@ boot_aps () at kern/init.c:107
 ### - ¿Qué valor tendrá el registro %eip cuando se ejecute esa línea? (Responder con redondeo a 12 bits, justificando desde qué región de memoria se está ejecutando este código)
 
 RTA
+Redondeo a 12 bits: Los primeros 12 bits son 0.
+Min 10
+
 
 ### - ¿Se detiene en algún momento la ejecución si se pone un breakpoint en mpentry_start? ¿Por qué?
 
@@ -347,7 +350,12 @@ Para el caso B habria que hacer un paso extra ademas de la comprobacion en el if
 
 # try ipc send
 
-RESPONDER (ver clase del martes 3/8)
+## ¿Cómo se podría hacer bloqueante esta llamada? Esto es: qué estrategia de implementación se podría usar para que, si un proceso A intenta a enviar a B, pero B no está esperando un mensaje, el proceso A sea puesto en estado ENV_NOT_RUNNABLE, y sea despertado una vez B llame a ipc_recv().
+
+Una forma de hacer esto es asignarle al proceso B una lista (inicialmente vacia) con los procesos que intenten enviarles algo, de forma tal que:
+- Si el proceso A quiere enviarle algo a B y B no esta esperando, el proceso A se agregue a la lista de procesos "enviadores" de B y luego A se setee como ENV_NOT_RUNNABLE, de forma tal que cuando se reanude su ejecucion vuelva a verificar si B esta esperando o no y en el caso positivo le mande el dato.
+- Si B quiere recibir algo primero verifique si su lista de procesos enviadores esta vacia y en caso de que no lo este setee al primero de estos procesos como ENV_RUNNABLE y lo elimine de su lista, de forma tal que ese proceso pueda continuar su ejecucion y enviarle el dato que quisiera.
+
 
 
 
