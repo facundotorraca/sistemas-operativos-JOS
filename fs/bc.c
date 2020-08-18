@@ -50,15 +50,16 @@ bc_pgfault(struct UTrapframe *utf)
 	// the disk.
 	//
 	// LAB 5: you code here:
-    int perm = uvpt[PGNUM(addr)] & PTE_SYSCALL;
 
     addr = (void *)ROUNDDOWN((uintptr_t)addr, PGSIZE);
 
-    if ((r = sys_page_alloc(0, addr, perm)) < 0)
+    if ((r = sys_page_alloc(0, addr, PTE_U | PTE_P | PTE_W)) < 0)
         panic("in bc_pgfault, sys_page_alloc: %e", r);
 
     if ((r = ide_read(blockno * BLKSECTS, addr, BLKSECTS)) < 0)
         panic("ide_read error: %e", r);
+
+    int perm = uvpt[PGNUM(addr)] & PTE_SYSCALL;
 
 	// Clear the dirty bit for the disk block page since we just read the
 	// block from disk
