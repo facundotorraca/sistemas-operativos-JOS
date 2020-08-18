@@ -62,8 +62,23 @@ alloc_block(void)
 	// super->s_nblocks blocks in the disk altogether.
 
 	// LAB 5: Your code here.
-	panic("alloc_block not implemented");
-	return -E_NO_DISK;
+	bool free_block = false;
+	uint32_t blockno = 1;
+	while (blockno < super->s_nblocks && !free_block)
+	    free_block = block_is_free(blockno++);
+
+	if (!free_block)
+        return -E_NO_DISK;
+
+    void *addr = diskaddr(--blockno);
+
+    int r;
+    if ((r = sys_page_alloc(0, addr, PTE_U | PTE_P | PTE_W)) < 0)
+        panic("in alloc_block, sys_page_alloc: %e", r);
+
+    bitmap[blockno / 32] &= 0 << (blockno % 32);
+
+    return blockno;
 }
 
 // Validate the file system bitmap.
@@ -133,7 +148,30 @@ static int
 file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool alloc)
 {
 	// LAB 5: Your code here.
-	panic("file_block_walk not implemented");
+	if (fliebno >= NDIRECT + NINDIRECT)
+	    return -E_INVAL;
+
+	if (filebno < NDIRECT) {
+        *ppdiskbno = &f->f_direct[NDIRECT];
+        return 0;
+    }
+
+    uint32_t *indirect_block_addr = (uint32_t *)f->f_indirect;
+	uint32_t real_block_no = indirect_block_addr[filebno - NDIRECT];
+
+    int new_block_no;
+    if (block_is_free(real_block_no) && !alloc) {
+        return -E_NOT_FOUND;
+    } else if (block_is_free(real_block_no) && alloc) {
+        new_block_no = alloc_block();
+        if (new_block_no < 0)
+            return new_block_no;
+        indirect_block_addr[filebno - NDIRECT] = new_block_no;
+    }
+    
+    *ppdiskbno = &indirect_block_addr[filebno - NDIRECT];
+    return 0;
+
 }
 
 // Set *blk to the address in memory where the filebno'th
