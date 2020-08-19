@@ -169,6 +169,7 @@ file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool all
             panic("in flie_block_walk, sys_page_alloc: %e", r);
 
         memset(blockaddr, 0, PGSIZE);
+        flush_block(blockaddr); // update disk
     }
 
     uint32_t *indirect_block_addr = (uint32_t *)diskaddr(f->f_indirect);
@@ -191,13 +192,19 @@ int
 file_get_block(struct File *f, uint32_t filebno, char **blk)
 {
 	// LAB 5: Your code here.
-	uint32_t *blkno;
-    int r = file_block_walk(f, filebno, &blkno, true);
+    int r;
+
+    uint32_t *blkno;
+    r = file_block_walk(f, filebno, &blkno, true);
 
     if (r < 0) return r;
 
     // if block is empty
-    if (!*blkno) *blkno = alloc_block();
+    if (!*blkno) {
+        r = alloc_block();
+        if (r < 0) return r;
+        *blkno = r;
+    }
 
     *blk = (char *)diskaddr(*blkno);
 
