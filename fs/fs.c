@@ -68,16 +68,11 @@ alloc_block(void)
 	while (blockno < super->s_nblocks && !free_block)
 	    free_block = block_is_free(blockno++);
 
-	if (!free_block)
-        return -E_NO_DISK;
-
-    void *addr = diskaddr(--blockno);
-
-    int r;
-    if ((r = sys_page_alloc(0, addr, PTE_U | PTE_P | PTE_W)) < 0)
-        panic("in alloc_block, sys_page_alloc: %e", r);
+	if (!free_block) return -E_NO_DISK;
 
     bitmap[blockno / 32] &= 0 << (blockno % 32);
+
+    flush_block(bitmap);
 
     return blockno;
 }
@@ -153,26 +148,33 @@ file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool all
 	    return -E_INVAL;
 
 	if (filebno < NDIRECT) {
-        *ppdiskbno = &f->f_direct[filebno];
+        if (ppdiskbno) *ppdiskbno = diskaddr(f->f_direct[filebno]);
         return 0;
     }
 
-    uint32_t *indirect_block_addr = (uint32_t *)f->f_indirect;
-	uint32_t real_block_no = indirect_block_addr[filebno - NDIRECT];
+    if (!f->f_indirect) {
+        if (!alloc) return -E_NOT_FOUND;
 
-    if (block_is_free(real_block_no) && !alloc)
-        return -E_NOT_FOUND;
+        int new_block_no;
+        if ((new_block_no = alloc_block()) < 0)
+            return new_block_no;
 
-    if (block_is_free(real_block_no)) {
-        int r, new_block_no;
-        if ((r = alloc_block()) < 0)
-            return r;
+        f->f_indirect = new_block_no;
 
-        new_block_no = r;
-        indirect_block_addr[filebno - NDIRECT] = new_block_no;
+        void* blockaddr = diskaddr(new_block_no);
+
+        int r;
+        if ((r = sys_page_alloc(0, blockaddr, PTE_U | PTE_P | PTE_W)) < 0)
+            panic("in flie_block_walk, sys_page_alloc: %e", r);
+
+        memset(blockaddr, 0, PGSIZE);
     }
 
-    *ppdiskbno = &indirect_block_addr[filebno - NDIRECT];
+    uint32_t *indirect_block_addr = (uint32_t *)diskaddr(f->f_indirect);
+    uint32_t real_block_no = indirect_block_addr[filebno - NDIRECT];
+
+    if(ppdiskbno) *ppdiskbno = diskaddr(indirect_block_addr[filebno - NDIRECT]);
+
     return 0;
 }
 
@@ -188,7 +190,9 @@ int
 file_get_block(struct File *f, uint32_t filebno, char **blk)
 {
 	// LAB 5: Your code here.
+    int r = file_block_walk(f, filebno, (uint32_t**)blk, 1);
 
+    return r;
 }
 
 // Try to find a file named "name" in dir.  If so, set *file to it.
