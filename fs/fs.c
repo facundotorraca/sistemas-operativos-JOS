@@ -70,9 +70,10 @@ alloc_block(void)
 
 	if (!free_block) return -E_NO_DISK;
 
-    bitmap[blockno / 32] &= 0 << (blockno % 32);
+    --blockno;
+	bitmap[blockno / 32] &= ~(1 << (blockno % 32));
 
-    flush_block(bitmap);
+    flush_block(&bitmap[blockno / 32]);
 
     return blockno;
 }
@@ -148,7 +149,7 @@ file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool all
 	    return -E_INVAL;
 
 	if (filebno < NDIRECT) {
-        if (ppdiskbno) *ppdiskbno = diskaddr(f->f_direct[filebno]);
+        if (ppdiskbno) *ppdiskbno = &f->f_direct[filebno];
         return 0;
     }
 
@@ -173,7 +174,7 @@ file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool all
     uint32_t *indirect_block_addr = (uint32_t *)diskaddr(f->f_indirect);
     uint32_t real_block_no = indirect_block_addr[filebno - NDIRECT];
 
-    if(ppdiskbno) *ppdiskbno = diskaddr(indirect_block_addr[filebno - NDIRECT]);
+    if(ppdiskbno) *ppdiskbno = &indirect_block_addr[filebno - NDIRECT];
 
     return 0;
 }
@@ -190,8 +191,10 @@ int
 file_get_block(struct File *f, uint32_t filebno, char **blk)
 {
 	// LAB 5: Your code here.
-    int r = file_block_walk(f, filebno, (uint32_t**)blk, 1);
-
+	uint32_t *blkno;
+    int r = file_block_walk(f, filebno, &blkno, 1);
+    if (r == 0)
+        *blk = (char *)diskaddr(*blkno);
     return r;
 }
 
