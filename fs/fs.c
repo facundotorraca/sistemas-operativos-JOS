@@ -192,9 +192,15 @@ file_get_block(struct File *f, uint32_t filebno, char **blk)
 {
 	// LAB 5: Your code here.
 	uint32_t *blkno;
-    int r = file_block_walk(f, filebno, &blkno, 1);
-    if (r == 0)
-        *blk = (char *)diskaddr(*blkno);
+    int r = file_block_walk(f, filebno, &blkno, true);
+
+    if (r < 0) return r;
+
+    // if block is empty
+    if (!*blkno) *blkno = alloc_block();
+
+    *blk = (char *)diskaddr(*blkno);
+
     return r;
 }
 
