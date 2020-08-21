@@ -84,6 +84,8 @@ extern void trap_19(void);
 extern void trap_48(void);
 
 extern void trap_timer(void);
+extern void trap_keyboard(void);
+extern void trap_serial(void);
 
 void
 trap_init(void)
@@ -113,8 +115,14 @@ trap_init(void)
     SETGATE(idt[T_SIMDERR], 0, GD_KT, &trap_19, 0);
     SETGATE(idt[T_SYSCALL], 0, GD_KT, &trap_48, 3);
 
-    // timer insterrupts
+    // timer interrupts
     SETGATE(idt[IRQ_TIMER + IRQ_OFFSET], 0, GD_KT, &trap_timer, 0);
+
+    // keyboard interrupts
+    SETGATE(idt[IRQ_OFFSET + IRQ_KBD], 0 , GD_KT, &trap_keyboard, 0);
+
+    // serial interrupt
+    SETGATE(idt[IRQ_OFFSET + IRQ_SERIAL], 0 , GD_KT, &trap_serial, 0);
 
 	// Per-CPU setup
 	trap_init_percpu();
@@ -263,14 +271,20 @@ trap_dispatch(struct Trapframe *tf)
 	// interrupt using lapic_eoi() before calling the scheduler!
 	// LAB 4: Your code here.
     switch (tf->tf_trapno - IRQ_OFFSET) {
+	    //Handle timer interrupts
         case IRQ_TIMER:
             lapic_eoi();
             sched_yield();
             return;
+        // Handle keyboard interrupts.
+        case IRQ_KBD:
+            kbd_intr();
+            return;
+        // Handle serial interrupts.
+        case IRQ_SERIAL:
+            serial_intr();
+            return;
     }
-
-	// Handle keyboard and serial interrupts.
-	// LAB 5: Your code here.
 
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);

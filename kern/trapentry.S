@@ -70,6 +70,8 @@ TRAPHANDLER_NOEC(trap_48, T_SYSCALL)
 
 // Timer handlers
 TRAPHANDLER_NOEC(trap_timer, IRQ_TIMER + IRQ_OFFSET)
+TRAPHANDLER_NOEC(trap_keyboard, IRQ_OFFSET + IRQ_KBD)
+TRAPHANDLER_NOEC(trap_serial, IRQ_OFFSET + IRQ_SERIAL)
 
 /*
  * Lab 3: Your code here for _alltraps
