@@ -78,7 +78,10 @@ duppage(envid_t envid, unsigned pn)
     // Copy all perms without PTE_W
     int perm = pg & PTE_SYSCALL & ~PTE_W;
 
-    if ((pg & PTE_W) || (pg & PTE_COW))
+    if (pg & PTE_SHARE)
+        perm |= (PTE_SHARE | (pg & PTE_W));
+        
+    else if ((pg & PTE_W) || (pg & PTE_COW))
         perm |= PTE_COW;
 
     int r;

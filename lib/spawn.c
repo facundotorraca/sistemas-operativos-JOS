@@ -5,6 +5,8 @@
 #define UTEMP2 (UTEMP + PGSIZE)
 #define UTEMP3 (UTEMP2 + PGSIZE)
 
+#define LG_PGSIZE 4194304 //4*1024*1024 4mb
+
 // Helper functions for spawn.
 static int init_stack(envid_t child, const char **argv, uintptr_t *init_esp);
 static int map_segment(envid_t child,
@@ -323,5 +325,25 @@ static int
 copy_shared_pages(envid_t child)
 {
 	// LAB 5: Your code here.
+    int r, perm;
+
+    uintptr_t ptva; // page table start va
+    for (ptva = 0; ptva < UTOP; ptva += LG_PGSIZE) {
+        if (uvpd[PDX(ptva)] & PTE_P) {
+
+            uintptr_t maxVa = (ptva + LG_PGSIZE) < USTACKTOP ?
+                              (ptva + LG_PGSIZE) : USTACKTOP;
+
+            for (uintptr_t va = ptva; va < maxVa; va += PGSIZE) {
+                perm = uvpt[PGNUM(va)] & PTE_SYSCALL;
+
+                if ((perm & PTE_P) && (perm & PTE_SHARE)) {
+                    if ((r = sys_page_map(0, (void *)va, child, (void *)va, perm)) < 0)
+                        panic("sys_page_map: %e", r);
+                }
+            }
+
+        }
+    }
 	return 0;
 }
