@@ -5,6 +5,7 @@
 
 #define LG_PGSIZE 4194304 //4*1024*1024 4mb
 
+
 // PTE_COW marks copy-on-write page table entries.
 // It is one of the bits explicitly allocated to user processes (PTE_AVAIL).
 #define PTE_COW 0x800
@@ -80,7 +81,7 @@ duppage(envid_t envid, unsigned pn)
 
     if (pg & PTE_SHARE)
         perm |= (PTE_SHARE | (pg & PTE_W));
-        
+
     else if ((pg & PTE_W) || (pg & PTE_COW))
         perm |= PTE_COW;
 
